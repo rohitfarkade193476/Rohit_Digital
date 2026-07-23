@@ -1,0 +1,40 @@
+{
+  "name": "digital-complaint-system-backend",
+  "version": "1.0.0",
+  "description": "Backend API for Digital Complaint System",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node prisma/seed.js",
+    "prisma:reset": "prisma migrate reset --force && npm run prisma:seed"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@better-auth/prisma-adapter": "^1.6.23",
+    "@prisma/client": "^6.19.3",
+    "bcrypt": "^6.0.0",
+    "better-auth": "^1.6.24",
+    "compression": "^1.8.1",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-validator": "^7.3.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.11.0"
+  },
+  "devDependencies": {
+    "@better-auth/cli": "^1.4.21",
+    "nodemon": "^3.1.14",
+    "prisma": "^6.19.3"
+  }
+}

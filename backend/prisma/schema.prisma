@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  SUPER_ADMIN
+  SOCIETY_ADMIN
+}
+
+enum SocietyStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+// ─────────────────────────────────────────────
+// MODELS
+// ─────────────────────────────────────────────
+
+model Society {
+  id                 String        @id @default(cuid())
+  name               String
+  societyCode        String        @unique
+  registrationNumber String?       @unique
+  address            String
+  city               String
+  state              String
+  pincode            String
+  contactEmail       String        @unique
+  contactPhone       String
+  logo               String?
+  status             SocietyStatus @default(ACTIVE)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  createdById String?
+
+  createdBy User?  @relation("SocietyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  users     User[]
+
+  @@index([societyCode])
+  @@index([status])
+  @@index([createdById])
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  firstName     String
+  lastName      String
+  email         String?  @unique
+  phone         String?  @unique
+  emailVerified Boolean  @default(false)
+  role          UserRole
+  societyId     String?
+  image         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  createdSocieties Society[] @relation("SocietyCreator")
+
+  society  Society?  @relation(fields: [societyId], references: [id])
+  sessions Session[]
+  accounts Account[]
+
+  @@index([societyId])
+  @@index([role])
+}
+
+// ─────────────────────────────────────────────
+// BETTER AUTH TABLES (do not modify)
+// ─────────────────────────────────────────────
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+}
