@@ -4,8 +4,8 @@ import { emailValidation } from "../common/email.validator.js";
 import { passwordValidation } from "../common/password.validator.js";
 
 export const registerSuperAdminValidation = [
-  firstNameValidation,
-  lastNameValidation,
-  emailValidation,
-  passwordValidation,
+  firstNameValidation(),
+  lastNameValidation(),
+  emailValidation(),
+  passwordValidation(),
 ];

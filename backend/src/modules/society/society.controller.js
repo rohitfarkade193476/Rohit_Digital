@@ -1,48 +1,53 @@
-import { registerSociety } from "./society.service.js";
+import {
+  registerSociety,
+  getSocietyProfile,
+  updateSocietyProfile,
+} from "./society.service.js";
 
-export const registerSocietyHandler = async (req, res) => {
-  try {
-    const result = await registerSociety(req.body);
+import {
+  successResponse,
+  errorResponse,
+} from "../../utils/response.js";
 
-    return res.status(201).json({
-      success: true,
-      message: "Society registered successfully",
-      data: result,
-    });
-  } catch (error) {
-    if (error.code === "USER_ALREADY_EXISTS") {
-      return res.status(409).json({
-        success: false,
-        message: "An account with this email already exists. Please use another email.",
-      });
-    }
+import asyncHandler from "../../utils/asyncHandler.js";
 
-    if (error.code === "P2002") {
-      const field = error.meta?.target?.[0];
-      if (field === "registrationNumber") {
-        return res.status(409).json({
-          success: false,
-          message: "A society with this registration number already exists.",
-        });
-    }
+export const registerSocietyHandler = asyncHandler(async (req, res) => {
+  const result = await registerSociety(req.body);
 
-    if (field === "societyCode") {
-    return res.status(409).json({
-      success: false,
-      message: "Society code already exists. Please try again.",
-    });
+  return successResponse(
+    res,
+    201,
+    "Society registered successfully",
+    result,
+  );
+});
+
+export const getSocietyProfileHandler = asyncHandler(async (req, res) => {
+  const society = await getSocietyProfile(req.user.societyId);
+
+  if (!society) {
+    return errorResponse(
+      res,
+      404,
+      "Society not found"
+    );
   }
 
-  return res.status(409).json({
-    success: false,
-    message: "Duplicate data found.",
-  });
-}
+  return successResponse(
+    res,
+    200,
+    "Society profile fetched successfully",
+    society
+  );
+});
 
-    console.error("Society registration error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
-  }
-};
+export const updateSocietyProfileHandler = asyncHandler(async (req, res) => {
+  const society = await updateSocietyProfile(req.user.societyId, req.body);
+
+  return successResponse(
+    res,
+    200,
+    "Society profile updated successfully",
+    society
+  );
+});
