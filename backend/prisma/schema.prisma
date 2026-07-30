@@ -14,12 +14,27 @@ datasource db {
 enum UserRole {
   SUPER_ADMIN
   SOCIETY_ADMIN
+  RESIDENT
 }
 
 enum SocietyStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
+}
+
+enum FlatStatus {
+  VACANT
+  OCCUPIED
+  BLOCKED
+}
+
+enum FlatType {
+  ONE_BHK
+  TWO_BHK
+  THREE_BHK
+  FOUR_BHK
+  PENTHOUSE
 }
 
 // ─────────────────────────────────────────────
@@ -46,6 +61,8 @@ model Society {
 
   createdBy User?  @relation("SocietyCreator", fields: [createdById], references: [id], onDelete: SetNull)
   users     User[]
+  flats     Flat[]
+  residents Resident[]
 
   @@index([societyCode])
   @@index([status])
@@ -70,11 +87,46 @@ model User {
   createdSocieties Society[] @relation("SocietyCreator")
 
   society  Society?  @relation(fields: [societyId], references: [id])
+  resident Resident?
   sessions Session[]
   accounts Account[]
 
   @@index([societyId])
   @@index([role])
+}
+
+model Flat {
+  id         String     @id @default(cuid())
+  societyId  String
+  flatNumber String
+  wing       String?
+  floor      Int
+  type       FlatType
+  status     FlatStatus @default(VACANT)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  society  Society   @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  resident Resident?
+
+  @@unique([societyId, flatNumber])
+  @@index([societyId])
+}
+
+model Resident {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  societyId    String
+  flatId       String   @unique
+  residentType String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  flat    Flat    @relation(fields: [flatId], references: [id], onDelete: Cascade)
+
+  @@index([societyId])
 }
 
 // ─────────────────────────────────────────────

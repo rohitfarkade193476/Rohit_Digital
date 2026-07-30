@@ -1,6 +1,7 @@
 import { body } from "express-validator";
 
-export const addressValidation = body("address")
-  .trim()
-  .notEmpty()
-  .withMessage("Address is required");
+export const addressValidation = (field = "address") =>
+  body(field)
+    .trim()
+    .notEmpty()
+    .withMessage("Address is required");

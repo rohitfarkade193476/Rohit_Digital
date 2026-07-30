@@ -1,6 +1,7 @@
 import { body } from "express-validator";
 
-export const cityValidation = body("city")
-  .trim()
-  .notEmpty()
-  .withMessage("City is required");
+export const cityValidation = (field = "city") =>
+  body(field)
+    .trim()
+    .notEmpty()
+    .withMessage("City is required");
