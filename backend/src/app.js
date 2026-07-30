@@ -37,6 +37,8 @@ app.get("/api/health", (req, res) => {
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/society", societyRoutes);
 app.use("/api/flats", flatRoutes);
+
+
 app.use("/api/residents", residentRoutes);
 
 app.use((req, res) => {
