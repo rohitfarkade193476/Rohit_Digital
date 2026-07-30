@@ -1,5 +1,5 @@
 import { auth } from "../lib/auth.js";
-
+import { errorResponse } from "../utils/response.js";
 export const requireAuth = async (req, res, next) => {
   try {
     const session = await auth.api.getSession({
@@ -7,30 +7,31 @@ export const requireAuth = async (req, res, next) => {
     });
 
     if (!session || !session.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return errorResponse(
+        res,
+        401,
+        "Authentication required"
+      );
     }
 
     if (!session.user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Account has been deactivated",
-      });
+      return errorResponse(
+        res,
+        403,
+        "Account has been deactivated"
+      );
     }
 
     req.user = session.user;
     req.session = session.session;
     next();
   }
-  //  catch {
-  //   return res.status(401).json({
-  //     success: false,
-  //     message: "Invalid or expired session",
-  //   });
-  // }
-  catch (error) {
-    console.error(error);
+   catch(error) {
+    console.error("Authentication Error:", error);
+    return errorResponse(
+      res,
+      401,
+      "Invalid or expired session"
+    );
   }
 };

@@ -1,6 +1,60 @@
 import { auth } from "../../lib/auth.js";
 import prisma from "../../config/prisma.js";
 
+export const getSocietyProfile = async (societyId) => {
+  const society = await prisma.society.findUnique({
+    where: { id: societyId },
+    select: {
+      id: true,
+      name: true,
+      societyCode: true,
+      registrationNumber: true,
+      address: true,
+      city: true,
+      state: true,
+      pincode: true,
+      contactEmail: true,
+      contactPhone: true,
+      logo: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return society;
+};
+
+export const updateSocietyProfile = async (societyId, data) => {
+  const society = await prisma.society.update({
+    where: { id: societyId },
+    data: {
+      ...(data.address !== undefined && { address: data.address }),
+      ...(data.contactEmail !== undefined && { contactEmail: data.contactEmail }),
+      ...(data.contactPhone !== undefined && { contactPhone: data.contactPhone }),
+      ...(data.logo !== undefined && { logo: data.logo }),
+    },
+    select: {
+      id: true,
+      name: true,
+      societyCode: true,
+      registrationNumber: true,
+      address: true,
+      city: true,
+      state: true,
+      pincode: true,
+      contactEmail: true,
+      contactPhone: true,
+      logo: true,
+      status: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+
+  return society;
+};
+
 const generateSocietyCode = (name) => {
   const cleaned = name
     .replace(/[^a-zA-Z0-9]/g, "")
@@ -31,6 +85,31 @@ const generateUniqueSocietyCode = async (name) => {
 };
 
 export const registerSociety = async (data) => {
+
+   const existingUser = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: data.email },
+        { phone: data.phone },
+      ],
+    },
+  });
+
+  if (existingUser) {
+    if (existingUser.email === data.email) {
+      const err = new Error("Email already exists");
+      err.code = "USER_ALREADY_EXISTS";
+      throw err;
+    }
+
+    if (existingUser.phone === data.phone) {
+      const err = new Error("Phone number already exists");
+      err.code = "PHONE_ALREADY_EXISTS";
+        console.log("Service throwing:", err.code);
+      throw err;
+    }
+  }
+  
   let authUser;
   try {
    authUser = await auth.api.signUpEmail({
@@ -45,13 +124,13 @@ export const registerSociety = async (data) => {
     },
   }); 
  } catch (error) {
-  if (
-    error.body?.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
-  ) {
-    const err = new Error("Email already exists");
-    err.code = "USER_ALREADY_EXISTS";
-    throw err;
-  }
+  // if (
+  //   error.body?.code === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"
+  // ) {
+  //   const err = new Error("Email already exists");
+  //   err.code = "USER_ALREADY_EXISTS";
+  //   throw err;
+  // }
 
   throw error;
 }

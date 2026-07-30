@@ -1,17 +1,21 @@
+import { errorResponse } from "../utils/response.js";
+
 export const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({
-        success: false,
-        message: "Authentication required",
-      });
+      return errorResponse(
+        res,
+        401,
+        "Authentication required"
+      );
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Insufficient permissions",
-      });
+      return errorResponse(
+        res,
+        403,
+        "Insufficient permissions"
+      );
     }
 
     next();
