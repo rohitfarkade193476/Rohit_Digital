@@ -1,19 +1,8 @@
-/**
- * authApi.js
- * Thin wrapper around the backend better-auth HTTP endpoints.
- *
- * Better-auth exposes these REST routes automatically:
- *   POST  /api/auth/sign-in/email   → login
- *   GET   /api/auth/get-session     → check active session + user
- *   POST  /api/auth/sign-out        → logout (clears the cookie)
- *
- * All calls use withCredentials (set globally on axiosInstance) so the
- * browser sends and receives the session cookie transparently.
- */
+
 import axiosInstance from './axiosInstance.js';
 
 /**
- * Sign in with email + password.
+ * Sign in with email and password.
  * @param {{ email: string, password: string }} credentials
  * @returns {Promise<{ user: object, session: object }>}
  */
@@ -26,8 +15,7 @@ export async function signIn({ email, password }) {
 }
 
 /**
- * Fetch the currently active session from the backend.
- * Returns null if there is no valid session (cookie missing / expired).
+
  * @returns {Promise<{ user: object, session: object } | null>}
  */
 export async function getSession() {
@@ -47,4 +35,14 @@ export async function getSession() {
  */
 export async function signOut() {
   await axiosInstance.post('/api/auth/sign-out');
+}
+
+
+export async function registerSociety(data) {
+  const response = await axiosInstance.post(
+    "/api/society/register",
+    data
+  );
+
+  return response.data;
 }

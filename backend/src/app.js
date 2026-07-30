@@ -8,6 +8,8 @@ import { env } from "./config/env.js";
 import { auth } from "./lib/auth.js";
 import superAdminRoutes from "./modules/auth/super-admin.routes.js";
 import societyRoutes from "./modules/society/society.routes.js";
+import flatRoutes from "./modules/flat/flat.routes.js";
+import residentRoutes from "./modules/resident/resident.routes.js";
 
 import errorHandler from "./middlewares/error.middleware.js";
 
@@ -34,6 +36,8 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/super-admin", superAdminRoutes);
 app.use("/api/society", societyRoutes);
+app.use("/api/flats", flatRoutes);
+app.use("/api/residents", residentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

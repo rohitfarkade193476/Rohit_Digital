@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { registerSocietySchema } from '../schemas/auth/registerSocietySchema.js';
 import Input from '../components/Input.jsx';
 import Button from '../components/Button.jsx';
+import { registerSociety } from "../lib/authApi";
 
 export default function RegisterSociety() {
+  const navigate = useNavigate();
   // Logo is a File — handled outside RHF because Zod can't run in the browser on File objects cleanly
   const [logoPreview, setLogoPreview] = useState(null);
 
@@ -42,9 +44,34 @@ export default function RegisterSociety() {
     setLogoPreview(URL.createObjectURL(file));
   }
 
-  function onSubmit(data) {
-    // TODO (Phase 2): call society registration API
-    console.log('Society registration submitted', data);
+  async function onSubmit(data) {
+    const payload = {
+    societyName: data.societyName,
+    registrationNumber: data.registrationNumber,
+    address: data.address,
+    city: data.city,
+    state: data.state,
+    pincode: data.pincode,
+    contactEmail: data.contactEmail,
+    contactPhone: data.contactPhone,
+
+    firstName: data.firstName,
+    lastName: data.lastName,
+    phone: data.phone,
+    email: data.email,
+    password: data.password,
+
+    // logo: null, 
+  };
+
+     try {
+    const response = await registerSociety(payload);
+    console.log('Society registered successfully:', response);
+    navigate('/login'); // Redirect to login page after successful registration
+     } catch (error) {
+    console.error(error.response?.data || error.message);
+    // Handle error (e.g., show a notification to the user)
+     }
   }
 
   return (

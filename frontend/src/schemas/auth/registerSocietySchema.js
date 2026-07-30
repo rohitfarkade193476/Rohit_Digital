@@ -1,21 +1,5 @@
 import { z } from 'zod';
 
-/**
- * registerSocietySchema.js
- * Zod validation schema for the Register Society form.
- *
- * Sections:
- *  1. Society Information  — societyName, registrationNumber, totalFlats
- *  2. Address              — address, city, state, pincode
- *  3. Society Contact      — contactEmail, contactPhone, logo (optional)
- *  4. Society Admin        — firstName, lastName, phone, email, password, confirmPassword
- *  5. Terms                — agreedToTerms
- *
- * All string fields are trimmed before validation.
- * Phone validation targets Indian mobile numbers: 10 digits optionally
- * prefixed by +91 or 0 (e.g. 9876543210, +919876543210, 09876543210).
- */
-
 const INDIAN_PHONE_REGEX = /^(?:\+91|0)?[6-9]\d{9}$/;
 
 export const registerSocietySchema = z
