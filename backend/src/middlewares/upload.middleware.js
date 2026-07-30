@@ -1,8 +1,14 @@
 import multer from "multer";
+import fs from "fs";
 import path from "path";
 
+// multer.diskStorage() creates the destination eagerly at import time, so the
+// directory has to exist and be writable by the process user before that runs.
+const uploadDir = path.resolve(process.cwd(), "uploads");
+fs.mkdirSync(uploadDir, { recursive: true });
+
 const storage = multer.diskStorage({
-  destination: "uploads/",
+  destination: uploadDir,
   filename: (req, file, cb) => {
     cb(null, Date.now() + path.extname(file.originalname));
   },

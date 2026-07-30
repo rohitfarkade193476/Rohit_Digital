@@ -43,3 +43,5 @@ Thumbs.db
 # Temporary
 tmp/
 temp/
+# Locally staged Excel uploads
+uploads/

@@ -38,6 +38,10 @@ COPY src ./src
 COPY entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
+# Excel imports are staged on disk by multer; /app is root-owned, so the upload
+# directory must exist and belong to the runtime user.
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+
 USER node
 
 EXPOSE 8000
