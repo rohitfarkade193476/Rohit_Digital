@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, User, Phone, Mail, Home, Calendar, Building, ShieldCheck } from 'lucide-react';
+import { X, Loader2, User, Phone, Mail, Home, Calendar, Building, ShieldCheck, AlertCircle } from 'lucide-react';
+import { getFlats } from '../../lib/flatsApi.js';
 
 export default function ResidentFormModal({
   isOpen,
@@ -22,8 +23,13 @@ export default function ResidentFormModal({
   });
 
   const [validationErrors, setValidationErrors] = useState({});
+  const [vacantFlats, setVacantFlats] = useState([]);
+  const [flatsLoading, setFlatsLoading] = useState(false);
+  const [flatsError, setFlatsError] = useState('');
 
   useEffect(() => {
+    if (!isOpen) return;
+
     if (initialData && (mode === 'edit' || mode === 'view')) {
       setFormData({
         name: initialData.name || '',
@@ -48,6 +54,26 @@ export default function ResidentFormModal({
       });
     }
     setValidationErrors({});
+    setFlatsError('');
+
+    setFlatsLoading(true);
+    getFlats(1, 200)
+      .then((res) => {
+        const allFlats = res.data?.flats || [];
+        let available = allFlats.filter((f) => f.status === 'VACANT');
+        if ((mode === 'edit' || mode === 'view') && initialData?.flatNumber) {
+          const currentFlat = allFlats.find((f) => f.flatNumber === initialData.flatNumber && f.wing === initialData.wing);
+          if (currentFlat && !available.find((f) => f.id === currentFlat.id)) {
+            available = [currentFlat, ...available];
+          }
+        }
+        setVacantFlats(available);
+      })
+      .catch((err) => {
+        setFlatsError(err.response?.data?.message || 'Failed to load flats');
+        setVacantFlats([]);
+      })
+      .finally(() => setFlatsLoading(false));
   }, [initialData, mode, isOpen]);
 
   if (!isOpen) return null;
@@ -99,6 +125,18 @@ export default function ResidentFormModal({
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (validationErrors[field]) {
       setValidationErrors((prev) => ({ ...prev, [field]: null }));
+    }
+  };
+
+  const handleFlatSelect = (flatNumber) => {
+    const flat = vacantFlats.find((f) => f.flatNumber === flatNumber);
+    setFormData((prev) => ({
+      ...prev,
+      flatNumber,
+      wing: flat ? flat.wing : prev.wing,
+    }));
+    if (validationErrors.flatNumber) {
+      setValidationErrors((prev) => ({ ...prev, flatNumber: null }));
     }
   };
 
@@ -233,16 +271,39 @@ export default function ResidentFormModal({
                 </label>
                 <div className="relative">
                   <Home className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="e.g. Flat A101"
-                    value={formData.flatNumber}
-                    onChange={(e) => handleChange('flatNumber', e.target.value)}
-                    disabled={isSubmitting || isView}
-                    className={`w-full pl-9 pr-3 py-2 bg-slate-50 border ${
-                      validationErrors.flatNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
-                    } rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 disabled:opacity-70`}
-                  />
+                  {flatsLoading ? (
+                    <div className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-400 flex items-center gap-2">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Loading flats...
+                    </div>
+                  ) : flatsError ? (
+                    <div className="w-full pl-9 pr-3 py-2 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-600 flex items-center gap-2">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">{flatsError}</span>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.flatNumber}
+                      onChange={(e) => handleFlatSelect(e.target.value)}
+                      disabled={isSubmitting || isView}
+                      className={`w-full pl-9 pr-3 py-2 bg-slate-50 border ${
+                        validationErrors.flatNumber ? 'border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                      } rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 disabled:opacity-70 cursor-pointer appearance-none`}
+                    >
+                      {vacantFlats.length === 0 ? (
+                        <option value="">No vacant flats available</option>
+                      ) : (
+                        <>
+                          <option value="">Select a flat...</option>
+                          {vacantFlats.map((flat) => (
+                            <option key={flat.id} value={flat.flatNumber}>
+                              Wing {flat.wing} — {flat.flatNumber}
+                            </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                  )}
                 </div>
                 {validationErrors.flatNumber && (
                   <p className="text-xs text-rose-500 mt-1">{validationErrors.flatNumber}</p>
@@ -259,7 +320,7 @@ export default function ResidentFormModal({
                   <select
                     value={formData.wing}
                     onChange={(e) => handleChange('wing', e.target.value)}
-                    disabled={isSubmitting || isView}
+                    disabled={isSubmitting || isView || formData.flatNumber !== ''}
                     className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 disabled:opacity-70 cursor-pointer"
                   >
                     <option value="A">Wing A</option>

@@ -1,6 +1,5 @@
-import React from 'react';
-
-export default function Input({
+import React, { forwardRef } from 'react';
+const Input = forwardRef(function Input({
   id,
   label,
   type = 'text',
@@ -10,7 +9,8 @@ export default function Input({
   error = '',
   required = false,
   className = '',
-}) {
+   ...props
+}, ref) {
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
       {label && (
@@ -24,6 +24,7 @@ export default function Input({
       )}
 
       <input
+       ref={ref}
         id={id}
         type={type}
         value={value}
@@ -35,6 +36,7 @@ export default function Input({
             ? 'border-red-400 bg-red-50 text-red-900 placeholder-red-300'
             : 'border-gray-300 bg-white text-gray-900 placeholder-gray-400 hover:border-gray-400'
         }`}
+        {...props}
       />
 
       {error && (
@@ -42,4 +44,8 @@ export default function Input({
       )}
     </div>
   );
-}
+});
+
+Input.displayName = 'Input';
+
+export default Input;

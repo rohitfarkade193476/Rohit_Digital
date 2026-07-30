@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export default function ExcelUploadResidentModal({ isOpen, onClose, onUploadSuccess }) {
+export default function ExcelUploadResidentModal({ isOpen, onClose, onUploadSuccess, uploadFunction }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -58,22 +58,28 @@ export default function ExcelUploadResidentModal({ isOpen, onClose, onUploadSucc
     }
   };
 
-  const handleUploadSubmit = (e) => {
+  const handleUploadSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) return;
 
     setUploading(true);
     setError('');
 
-    // Simulate file processing
-    setTimeout(() => {
-      setUploading(false);
+    try {
+      if (uploadFunction) {
+        await uploadFunction(selectedFile);
+      }
+
       if (onUploadSuccess) {
         onUploadSuccess(selectedFile.name);
       }
       setSelectedFile(null);
       onClose();
-    }, 1000);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
