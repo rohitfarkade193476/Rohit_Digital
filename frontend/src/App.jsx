@@ -70,20 +70,6 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* TEMPORARY — UI preview only */}
-<Route path="/resident-dashboard-preview" element={<DashboardLayout />}>
-  <Route index element={<ResidentDashboard />} />
-</Route>
-
-
-<Route path="/resident-complaints-preview" element={<DashboardLayout />}>
-  <Route index element={<ResidentComplaints />} />
-</Route>
-
-<Route path="/raise-complaint-preview" element={<DashboardLayout />}>
-  <Route index element={<RaiseComplaint />} />
-</Route>
-
     </Routes>
   );
 }
