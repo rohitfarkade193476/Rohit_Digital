@@ -3,6 +3,7 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 
 import prisma from "../config/prisma.js";
 import { env } from "../config/env.js";
+import { sendPasswordSetupEmail } from "./mailer.js";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
@@ -14,6 +15,36 @@ export const auth = betterAuth({
 
   emailAndPassword: {
     enabled: true,
+    resetPasswordTokenExpiresIn: 60 * 60 * 72,
+    sendResetPassword: async ({ user, token }) => {
+      const activationUrl = `${env.FRONTEND_URL}/activate-account?token=${token}`;
+
+      try {
+        await sendPasswordSetupEmail({
+          email: user.email,
+          name: user.name,
+          activationUrl,
+        });
+      } catch (error) {
+        console.error(
+          `Failed to send password setup email to ${user.email}:`,
+          error
+        );
+      }
+    },
+    onPasswordReset: async ({ user }) => {
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { emailVerified: true },
+        });
+      } catch (error) {
+        console.error(
+          `Failed to mark email as verified after password reset for user ${user.id}:`,
+          error
+        );
+      }
+    },
   },
 
   session: {
@@ -60,7 +91,6 @@ export const auth = betterAuth({
   },
 
   trustedOrigins: [
-    "http://localhost:5173",
-    "http://localhost:3000",
+    env.FRONTEND_URL,
   ],
 });

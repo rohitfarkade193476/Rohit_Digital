@@ -48,7 +48,7 @@ const ROLE_MENUS = {
   ],
   RESIDENT: [
     { label: 'Dashboard', path: '/resident/dashboard', icon: LayoutDashboard },
-    { label: 'My Complaints', path: '/resident/my-complaints', icon: AlertCircle },
+    { label: 'My Complaints', path: '/resident/complaints', icon: AlertCircle },
     { label: 'Notices', path: '/resident/notices', icon: Bell },
     { label: 'Payments', path: '/resident/payments', icon: CreditCard },
     { label: 'Profile', path: '/resident/profile', icon: User },

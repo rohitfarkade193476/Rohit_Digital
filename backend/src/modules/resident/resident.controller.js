@@ -41,7 +41,11 @@ export const createResidentHandler = asyncHandler(async (req, res) => {
     return errorResponse(res, 409, result.message);
   }
 
-  return successResponse(res, 201, "Resident created successfully", result);
+  const message = result.invitationSent
+    ? "Resident created successfully and invitation email sent"
+    : "Resident created successfully but the invitation email could not be sent";
+
+  return successResponse(res, 201, message, result);
 });
 
 export const updateResidentHandler = asyncHandler(async (req, res) => {

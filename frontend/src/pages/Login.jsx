@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema } from '../schemas/auth/loginSchema.js';
@@ -150,16 +149,6 @@ export default function Login() {
           </Button>
         </form>
 
-        {/* Footer */}
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Managing a new society?{' '}
-          <Link
-            to="/register-society"
-            className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
-          >
-            Register here
-          </Link>
-        </p>
       </div>
     </div>
   );
