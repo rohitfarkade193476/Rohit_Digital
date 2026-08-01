@@ -5,6 +5,19 @@ import prisma from "../config/prisma.js";
 import { env } from "../config/env.js";
 import { sendPasswordSetupEmail } from "./mailer.js";
 
+const getRoleLabel = (role) => {
+  switch (role) {
+    case "STAFF":
+      return "Staff";
+    case "VENDOR":
+      return "Vendor";
+    case "RESIDENT":
+      return "Resident";
+    default:
+      return "Housing Society Portal";
+  }
+};
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -19,11 +32,26 @@ export const auth = betterAuth({
     sendResetPassword: async ({ user, token }) => {
       const activationUrl = `${env.FRONTEND_URL}/activate-account?token=${token}`;
 
+      let roleLabel = "Housing Society Portal";
+      try {
+        const userRow = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { role: true },
+        });
+        roleLabel = getRoleLabel(userRow?.role);
+      } catch (error) {
+        console.error(
+          `Failed to resolve role label for ${user.email}:`,
+          error
+        );
+      }
+
       try {
         await sendPasswordSetupEmail({
           email: user.email,
           name: user.name,
           activationUrl,
+          roleLabel,
         });
       } catch (error) {
         console.error(

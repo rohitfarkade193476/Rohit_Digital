@@ -1,0 +1,282 @@
+import prisma from "../../config/prisma.js";
+import { createNotification } from "../notifications/notification.service.js";
+
+const ACTIVE_STATUSES = ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"];
+
+const VALID_TRANSITIONS = {
+  ASSIGNED: ["ACCEPTED", "CANCELLED"],
+  ACCEPTED: ["IN_PROGRESS", "CANCELLED"],
+  IN_PROGRESS: ["COMPLETED"],
+  COMPLETED: [],
+  CANCELLED: [],
+};
+
+const ASSIGNMENT_INCLUDE = {
+  vendor: {
+    select: {
+      id: true,
+      companyName: true,
+      category: true,
+      city: true,
+      user: { select: { name: true, phone: true, email: true } },
+    },
+  },
+  society: {
+    select: { id: true, name: true, societyCode: true },
+  },
+  complaint: {
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      priority: true,
+      status: true,
+      resident: {
+        select: {
+          id: true,
+          user: { select: { name: true, phone: true, email: true } },
+          flat: { select: { flatNumber: true, wing: true } },
+        },
+      },
+    },
+  },
+  assignedBy: {
+    select: { id: true, name: true },
+  },
+};
+
+const mapAssignment = (assignment) => ({
+  id: assignment.id,
+  status: assignment.status,
+  assignedAt: assignment.assignedAt,
+  acceptedAt: assignment.acceptedAt,
+  startedAt: assignment.startedAt,
+  completedAt: assignment.completedAt,
+  cancelledAt: assignment.cancelledAt,
+  vendor: {
+    id: assignment.vendor.id,
+    companyName: assignment.vendor.companyName,
+    category: assignment.vendor.category,
+    city: assignment.vendor.city,
+    contactPerson: assignment.vendor.user.name,
+    phone: assignment.vendor.user.phone,
+    email: assignment.vendor.user.email,
+  },
+  society: assignment.society
+    ? {
+        id: assignment.society.id,
+        name: assignment.society.name,
+        societyCode: assignment.society.societyCode,
+      }
+    : null,
+  complaint: {
+    id: assignment.complaint.id,
+    title: assignment.complaint.title,
+    description: assignment.complaint.description || "",
+    category: assignment.complaint.category,
+    priority: assignment.complaint.priority,
+    status: assignment.complaint.status,
+    resident: assignment.complaint.resident
+      ? {
+          name: assignment.complaint.resident.user.name,
+          phone: assignment.complaint.resident.user.phone,
+          email: assignment.complaint.resident.user.email,
+          flatNumber: assignment.complaint.resident.flat?.flatNumber || "",
+          wing: assignment.complaint.resident.flat?.wing || "",
+        }
+      : null,
+  },
+  assignedBy: assignment.assignedBy
+    ? { id: assignment.assignedBy.id, name: assignment.assignedBy.name }
+    : null,
+});
+
+const getAdminSocietyId = async (userId) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { societyId: true },
+  });
+  return user?.societyId || null;
+};
+
+const getVendorIdForUser = async (userId) => {
+  const vendor = await prisma.vendor.findUnique({
+    where: { userId },
+    select: { id: true },
+  });
+  return vendor?.id || null;
+};
+
+/**
+ * Society Admin assigns a vendor to a complaint belonging to their own
+ * society. The society is always derived from the authenticated admin's
+ * user record — never from the request body.
+ */
+export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId) => {
+  const societyId = await getAdminSocietyId(adminUserId);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findFirst({
+    where: { id: complaintId, societyId },
+    select: { id: true, title: true },
+  });
+  if (!complaint) return { notFound: true };
+
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: {
+      id: true,
+      userId: true,
+      companyName: true,
+      isAvailable: true,
+      user: { select: { isActive: true, emailVerified: true } },
+    },
+  });
+  if (!vendor) return { notFound: true, message: "Vendor not found" };
+  if (!vendor.user.isActive || !vendor.user.emailVerified) {
+    return {
+      conflict: true,
+      message: "This vendor is not activated yet and cannot be assigned work",
+    };
+  }
+  if (!vendor.isAvailable) {
+    return { conflict: true, message: "This vendor is currently unavailable" };
+  }
+
+  const active = await prisma.vendorAssignment.findFirst({
+    where: { complaintId, status: { in: ACTIVE_STATUSES } },
+    select: { id: true },
+  });
+  if (active) {
+    return {
+      conflict: true,
+      message: "Complaint already has an active vendor assignment",
+    };
+  }
+
+  const assignment = await prisma.vendorAssignment.create({
+    data: {
+      vendorId,
+      societyId,
+      complaintId,
+      assignedById: adminUserId,
+      status: "ASSIGNED",
+    },
+    include: ASSIGNMENT_INCLUDE,
+  });
+
+  // In-app notification for the vendor. This is a best-effort side effect —
+  // a failure to notify must never fail the assignment itself.
+  try {
+    await createNotification({
+      userId: vendor.userId,
+      type: "VENDOR_ASSIGNMENT",
+      title: "New work assignment",
+      message: `You have been assigned to complaint "${complaint.title}"`,
+    });
+  } catch (error) {
+    console.error("Failed to create vendor assignment notification:", error);
+  }
+
+  return { assignment: mapAssignment(assignment) };
+};
+
+export const getComplaintAssignments = async (complaintId, adminUserId) => {
+  const societyId = await getAdminSocietyId(adminUserId);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findFirst({
+    where: { id: complaintId, societyId },
+    select: { id: true },
+  });
+  if (!complaint) return { notFound: true };
+
+  const assignments = await prisma.vendorAssignment.findMany({
+    where: { complaintId },
+    include: ASSIGNMENT_INCLUDE,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return { assignments: assignments.map(mapAssignment) };
+};
+
+export const listVendorAssignments = async (userId) => {
+  const vendorId = await getVendorIdForUser(userId);
+  if (!vendorId) return { forbidden: true };
+
+  const assignments = await prisma.vendorAssignment.findMany({
+    where: { vendorId },
+    include: ASSIGNMENT_INCLUDE,
+    orderBy: { assignedAt: "desc" },
+  });
+
+  return { assignments: assignments.map(mapAssignment) };
+};
+
+export const getVendorAssignmentById = async (userId, assignmentId) => {
+  const vendorId = await getVendorIdForUser(userId);
+  if (!vendorId) return { forbidden: true };
+
+  const assignment = await prisma.vendorAssignment.findFirst({
+    where: { id: assignmentId, vendorId },
+    include: ASSIGNMENT_INCLUDE,
+  });
+
+  if (!assignment) return { notFound: true };
+
+  return { assignment: mapAssignment(assignment) };
+};
+
+export const updateVendorAssignmentStatus = async (
+  userId,
+  assignmentId,
+  status
+) => {
+  const vendorId = await getVendorIdForUser(userId);
+  if (!vendorId) return { forbidden: true };
+
+  const assignment = await prisma.vendorAssignment.findFirst({
+    where: { id: assignmentId, vendorId },
+    select: { id: true, status: true, complaintId: true },
+  });
+
+  if (!assignment) return { notFound: true };
+
+  if (!VALID_TRANSITIONS[assignment.status]?.includes(status)) {
+    return {
+      invalidTransition: true,
+      message: `Cannot change assignment status from ${assignment.status} to ${status}`,
+    };
+  }
+
+  const data = { status };
+  if (status === "ACCEPTED") data.acceptedAt = new Date();
+  if (status === "IN_PROGRESS") data.startedAt = new Date();
+  if (status === "COMPLETED") data.completedAt = new Date();
+  if (status === "CANCELLED") data.cancelledAt = new Date();
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedAssignment = await tx.vendorAssignment.update({
+      where: { id: assignmentId },
+      data,
+      include: ASSIGNMENT_INCLUDE,
+    });
+
+    if (status === "ACCEPTED") {
+      await tx.complaint.update({
+        where: { id: assignment.complaintId },
+        data: { status: "IN_PROGRESS" },
+      });
+    } else if (status === "COMPLETED") {
+      await tx.complaint.update({
+        where: { id: assignment.complaintId },
+        data: { status: "RESOLVED" },
+      });
+    }
+
+    return updatedAssignment;
+  });
+
+  return { assignment: mapAssignment(updated) };
+};

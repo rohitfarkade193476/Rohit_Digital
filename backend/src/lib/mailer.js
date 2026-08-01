@@ -28,11 +28,11 @@ const getFirstName = (name) => {
   return trimmed.split(" ")[0] || "there";
 };
 
-const getTextBody = ({ firstName, activationUrl }) => {
+const getTextBody = ({ firstName, activationUrl, roleLabel }) => {
   return [
     `Hello ${firstName},`,
     "",
-    "A request was made to set up or reset the password for your Housing Society Portal account.",
+    `A request was made to set up or reset the password for your ${roleLabel} account on the Housing Society Portal.`,
     "Use the link below to choose your password and activate your account.",
     "",
     `${activationUrl}`,
@@ -46,7 +46,7 @@ const getTextBody = ({ firstName, activationUrl }) => {
   ].join("\n");
 };
 
-const getHtmlBody = ({ firstName, activationUrl }) => {
+const getHtmlBody = ({ firstName, activationUrl, roleLabel }) => {
   const safeUrl = escapeHtml(activationUrl);
   return `
   <div style="font-family: Arial, Helvetica, sans-serif; max-width: 560px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
@@ -54,10 +54,10 @@ const getHtmlBody = ({ firstName, activationUrl }) => {
       <p style="margin: 0; color: #ffffff; font-size: 18px; font-weight: 700; letter-spacing: 0.2px;">Housing Society Portal</p>
     </div>
     <div style="padding: 32px;">
-      <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 18px; font-weight: 700;">Activate your Housing Society account</h2>
+      <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 18px; font-weight: 700;">Activate your ${escapeHtml(roleLabel)} account</h2>
       <p style="margin: 0 0 12px; color: #334155; font-size: 14px; line-height: 1.7;">Hello ${escapeHtml(firstName)},</p>
       <p style="margin: 0 0 12px; color: #334155; font-size: 14px; line-height: 1.7;">
-        A request was made to set up or reset the password for your Housing Society Portal account.
+        A request was made to set up or reset the password for your ${escapeHtml(roleLabel)} account on the Housing Society Portal.
         Click the button below to choose your password and activate your account.
       </p>
       <div style="text-align: center; margin: 28px 0;">
@@ -79,23 +79,28 @@ const getHtmlBody = ({ firstName, activationUrl }) => {
 };
 
 /**
- * Sends a password setup / reset email used for both:
- *  - resident account activation (invitation email)
- *  - normal password reset
+ * Sends a password setup / reset email used for account activation and
+ * normal password resets. A single generic activation page
+ * (/activate-account?token=...) is shared by residents, staff and vendors.
  *
  * Resolves when the message has been accepted by the SMTP server.
  * Rejects if the email could not be sent, so callers can decide
  * how to handle the failure.
  */
-export const sendPasswordSetupEmail = async ({ email, name, activationUrl }) => {
+export const sendPasswordSetupEmail = async ({
+  email,
+  name,
+  activationUrl,
+  roleLabel = "Housing Society Portal",
+}) => {
   const firstName = getFirstName(name);
 
   const mailOptions = {
     from: env.MAIL_FROM,
     to: email,
-    subject: "Activate your Housing Society account",
-    text: getTextBody({ firstName, activationUrl }),
-    html: getHtmlBody({ firstName, activationUrl }),
+    subject: `Activate your ${roleLabel} account`,
+    text: getTextBody({ firstName, activationUrl, roleLabel }),
+    html: getHtmlBody({ firstName, activationUrl, roleLabel }),
   };
 
   return transporter.sendMail(mailOptions);

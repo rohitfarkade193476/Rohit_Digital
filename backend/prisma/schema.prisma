@@ -15,6 +15,8 @@ enum UserRole {
   SUPER_ADMIN
   SOCIETY_ADMIN
   RESIDENT
+  STAFF
+  VENDOR
 }
 
 enum SocietyStatus {
@@ -35,6 +37,28 @@ enum FlatType {
   THREE_BHK
   FOUR_BHK
   PENTHOUSE
+}
+
+enum ComplaintPriority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
 }
 
 // ─────────────────────────────────────────────
@@ -63,6 +87,9 @@ model Society {
   users     User[]
   flats     Flat[]
   residents Resident[]
+  staff     Staff[]
+  complaints       Complaint[]
+  vendorAssignments VendorAssignment[]
 
   @@index([societyCode])
   @@index([status])
@@ -88,8 +115,12 @@ model User {
 
   society  Society?  @relation(fields: [societyId], references: [id])
   resident Resident?
+  staff    Staff?
+  vendor   Vendor?
   sessions Session[]
   accounts Account[]
+  assignedAssignments VendorAssignment[] @relation("AssignmentAssignedBy")
+  notifications       Notification[]
 
   @@index([societyId])
   @@index([role])
@@ -108,6 +139,7 @@ model Flat {
 
   society  Society   @relation(fields: [societyId], references: [id], onDelete: Cascade)
   resident Resident?
+  complaints Complaint[]
 
   @@unique([societyId, flatNumber])
   @@index([societyId])
@@ -126,7 +158,114 @@ model Resident {
   society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
   flat    Flat    @relation(fields: [flatId], references: [id], onDelete: Cascade)
 
+  complaints Complaint[]
+
   @@index([societyId])
+}
+
+model Staff {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  societyId   String
+  role        String
+  department  String
+  joiningDate DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+
+  @@index([societyId])
+  @@index([userId])
+}
+
+model Vendor {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  companyName  String
+  category     String
+  contractType String?
+  description  String?
+  address      String?
+  city         String?
+  state        String?
+  pincode      String?
+  isAvailable  Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments VendorAssignment[]
+
+  @@index([userId])
+  @@index([category])
+  @@index([isAvailable])
+}
+
+model Complaint {
+  id          String            @id @default(cuid())
+  societyId   String
+  residentId  String
+  flatId      String
+  title       String
+  description String?
+  category    String
+  priority    ComplaintPriority @default(MEDIUM)
+  status      ComplaintStatus   @default(OPEN)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  society          Society           @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  resident         Resident          @relation(fields: [residentId], references: [id], onDelete: Cascade)
+  flat             Flat              @relation(fields: [flatId], references: [id], onDelete: Cascade)
+  vendorAssignments VendorAssignment[]
+
+  @@index([societyId])
+  @@index([residentId])
+  @@index([status])
+}
+
+model VendorAssignment {
+  id           String           @id @default(cuid())
+  vendorId     String
+  societyId    String
+  complaintId  String
+  assignedById String?
+  status       AssignmentStatus @default(ASSIGNED)
+  assignedAt   DateTime         @default(now())
+  acceptedAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  society   Society   @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  assignedBy User?    @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([vendorId])
+  @@index([societyId])
+  @@index([complaintId])
+  @@index([status])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
 }
 
 // ─────────────────────────────────────────────

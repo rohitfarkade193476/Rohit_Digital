@@ -10,6 +10,11 @@ import superAdminRoutes from "./modules/auth/super-admin.routes.js";
 import societyRoutes from "./modules/society/society.routes.js";
 import flatRoutes from "./modules/flat/flat.routes.js";
 import residentRoutes from "./modules/resident/resident.routes.js";
+import staffRoutes from "./modules/staff/staff.routes.js";
+import vendorRoutes from "./modules/vendor/vendor.routes.js";
+import complaintRoutes from "./modules/complaints/complaint.routes.js";
+import vendorAssignmentRoutes from "./modules/complaints/vendor-assignment.routes.js";
+import notificationRoutes from "./modules/notifications/notification.routes.js";
 
 import errorHandler from "./middlewares/error.middleware.js";
 
@@ -42,6 +47,11 @@ app.use("/api/flats", flatRoutes);
 
 
 app.use("/api/residents", residentRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/vendors", vendorRoutes);
+app.use("/api/complaints", complaintRoutes);
+app.use("/api/vendor/assignments", vendorAssignmentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
