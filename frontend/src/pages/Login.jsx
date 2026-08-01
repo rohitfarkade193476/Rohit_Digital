@@ -5,7 +5,7 @@ import { loginSchema } from "../schemas/auth/loginSchema.js";
 import Input from "../components/Input.jsx";
 import Button from "../components/Button.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 /**
  * Login.jsx
  * Public login page — all roles.
@@ -19,6 +19,9 @@ export default function Login() {
 
   // Backend / network-level error message (separate from field validation)
   const [serverError, setServerError] = useState("");
+
+  const location = useLocation();
+  const fromActivation = location.state?.fromActivation === true;
 
   const {
     register,
@@ -150,16 +153,17 @@ export default function Login() {
               "Sign In"
             )}
           </Button>
-
-          <p className="mt-6 text-center text-sm text-gray-500">
-            Managing a new society?{" "}
-            <Link
-              to="/register-society"
-              className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
-            >
-              Register here
-            </Link>
-          </p>
+          {!fromActivation && (
+            <p className="mt-6 text-center text-sm text-gray-500">
+              Managing a new society?{" "}
+              <Link
+                to="/register-society"
+                className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+              >
+                Register here
+              </Link>
+            </p>
+          )}
         </form>
       </div>
     </div>

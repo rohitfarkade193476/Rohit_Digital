@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React from "react";
+import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   Building2,
@@ -16,61 +16,76 @@ import {
   ClipboardList,
   CreditCard,
   X,
-  ShieldAlert
-} from 'lucide-react';
-import { useAuth } from '../../context/AuthContext.jsx';
+} from "lucide-react";
+import { useAuth } from "../../context/AuthContext.jsx";
 
 /**
  * Menu configuration keyed by user role.
  */
 const ROLE_MENUS = {
   SUPER_ADMIN: [
-    { label: 'Dashboard', path: '/super-admin/dashboard', icon: LayoutDashboard },
-    { label: 'Societies', path: '/super-admin/societies', icon: Building2 },
-    { label: 'Users', path: '/super-admin/users', icon: Users },
-    { label: 'Reports', path: '/super-admin/reports', icon: FileBarChart },
+    {
+      label: "Dashboard",
+      path: "/super-admin/dashboard",
+      icon: LayoutDashboard,
+    },
+    { label: "Societies", path: "/super-admin/societies", icon: Building2 },
+    { label: "Users", path: "/super-admin/users", icon: Users },
+    { label: "Reports", path: "/super-admin/reports", icon: FileBarChart },
   ],
   SOCIETY_ADMIN: [
-    { label: 'Dashboard', path: '/society-admin/dashboard', icon: LayoutDashboard },
-    { label: 'Flats', path: '/society-admin/flats', icon: Home },
-    { label: 'Residents', path: '/society-admin/residents', icon: UserCheck },
-    { label: 'Staff', path: '/society-admin/staff', icon: UserCog },
-    { label: 'Vendors', path: '/society-admin/vendors', icon: Briefcase },
-    { label: 'Complaints', path: '/society-admin/complaints', icon: AlertCircle },
-    { label: 'Maintenance', path: '/society-admin/maintenance', icon: Wrench },
-    { label: 'Notices', path: '/society-admin/notices', icon: Bell },
-    { label: 'Profile', path: '/society-admin/profile', icon: User },
+    {
+      label: "Dashboard",
+      path: "/society-admin/dashboard",
+      icon: LayoutDashboard,
+    },
+    { label: "Flats", path: "/society-admin/flats", icon: Home },
+    { label: "Residents", path: "/society-admin/residents", icon: UserCheck },
+    { label: "Staff", path: "/society-admin/staff", icon: UserCog },
+    { label: "Vendors", path: "/society-admin/vendors", icon: Briefcase },
+    {
+      label: "Complaints",
+      path: "/society-admin/complaints",
+      icon: AlertCircle,
+    },
+    { label: "Maintenance", path: "/society-admin/maintenance", icon: Wrench },
+    { label: "Notices", path: "/society-admin/notices", icon: Bell },
+    { label: "Profile", path: "/society-admin/profile", icon: User },
   ],
   STAFF: [
-    { label: 'Dashboard', path: '/staff/dashboard', icon: LayoutDashboard },
-    { label: 'Assigned Complaints', path: '/staff/assigned-complaints', icon: ClipboardList },
-    { label: 'Profile', path: '/staff/profile', icon: User },
+    { label: "Dashboard", path: "/staff/dashboard", icon: LayoutDashboard },
+    {
+      label: "Assigned Complaints",
+      path: "/staff/assigned-complaints",
+      icon: ClipboardList,
+    },
+    { label: "Profile", path: "/staff/profile", icon: User },
   ],
   RESIDENT: [
-    { label: 'Dashboard', path: '/resident/dashboard', icon: LayoutDashboard },
-    { label: 'My Complaints', path: '/resident/complaints', icon: AlertCircle },
-    { label: 'Notices', path: '/resident/notices', icon: Bell },
-    { label: 'Payments', path: '/resident/payments', icon: CreditCard },
-    { label: 'Profile', path: '/resident/profile', icon: User },
+    { label: "Dashboard", path: "/resident/dashboard", icon: LayoutDashboard },
+    { label: "My Complaints", path: "/resident/complaints", icon: AlertCircle },
+    { label: "Notices", path: "/resident/notices", icon: Bell },
+    { label: "Payments", path: "/resident/payments", icon: CreditCard },
+    { label: "Profile", path: "/resident/profile", icon: User },
   ],
   VENDOR: [
-    { label: 'Dashboard', path: '/vendor/dashboard', icon: LayoutDashboard },
-    { label: 'Assigned Work', path: '/vendor/assigned-work', icon: Briefcase },
-    { label: 'Profile', path: '/vendor/profile', icon: User },
+    { label: "Dashboard", path: "/vendor/dashboard", icon: LayoutDashboard },
+    { label: "Assigned Work", path: "/vendor/assigned-work", icon: Briefcase },
+    { label: "Profile", path: "/vendor/profile", icon: User },
   ],
 };
 
 const ROLE_BADGES = {
-  SUPER_ADMIN: 'Super Admin',
-  SOCIETY_ADMIN: 'Society Admin',
-  STAFF: 'Staff Member',
-  RESIDENT: 'Resident',
-  VENDOR: 'Vendor',
+  SUPER_ADMIN: "Super Admin",
+  SOCIETY_ADMIN: "Society Admin",
+  STAFF: "Staff Member",
+  RESIDENT: "Resident",
+  VENDOR: "Vendor",
 };
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user } = useAuth();
-  const userRole = user?.role || 'RESIDENT';
+  const userRole = user?.role || "RESIDENT";
   const menuItems = ROLE_MENUS[userRole] || [];
 
   return (
@@ -85,12 +100,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed top-0 left-0 z-50 h-full w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 left-0 z-50 h-screen w-64 bg-slate-900 text-slate-300 flex flex-col transition-transform duration-300 ease-in-out
+          ${isOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0 `}
       >
         {/* Brand Header */}
-        <div className="flex items-center justify-between h-16 px-6 bg-slate-950/60 border-b border-slate-800">
+        <div className="flex items-center justify-between h-16 shrink-0 px-6 bg-slate-950/60 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold shadow-md shadow-indigo-600/30">
               <Building2 className="w-5 h-5" />
@@ -104,6 +118,8 @@ export default function Sidebar({ isOpen, onClose }) {
               </span>
             </div>
           </div>
+
+
           <button
             onClick={onClose}
             className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 lg:hidden"
@@ -128,8 +144,8 @@ export default function Sidebar({ isOpen, onClose }) {
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/70'
+                      ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20 font-semibold"
+                      : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/70"
                   }`
                 }
               >
@@ -141,17 +157,19 @@ export default function Sidebar({ isOpen, onClose }) {
         </nav>
 
         {/* Footer info inside sidebar */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-950/40">
+        <div className="shrink-0 p-4 border-t border-slate-800/80 bg-slate-950/40">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-semibold text-slate-300">
-              {user?.firstName?.[0] || 'U'}
+              {user?.firstName?.[0] || "U"}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-medium text-slate-200 truncate">
-                {user?.firstName ? `${user.firstName} ${user?.lastName || ''}` : 'User Account'}
+                {user?.firstName
+                  ? `${user.firstName} ${user?.lastName || ""}`
+                  : "User Account"}
               </p>
               <p className="text-[11px] text-slate-500 truncate">
-                {user?.email || 'user@society.com'}
+                {user?.email || "user@society.com"}
               </p>
             </div>
           </div>

@@ -166,7 +166,7 @@ export default function ActivateAccount() {
             email, or contact your society admin to resend it.
           </p>
 
-          <Button type="button" fullWidth onClick={() => navigate('/login', { replace: true })}>
+          <Button type="button" fullWidth onClick={() => navigate('/login', { replace: true , state: { fromActivation: true } })}>
             Go to Login
           </Button>
         </div>
@@ -291,7 +291,7 @@ export default function ActivateAccount() {
           Already have an account?{' '}
           <button
             type="button"
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/login' , { state: { fromActivation: true } })}
             className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
           >
             Sign in here
