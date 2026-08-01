@@ -20,6 +20,13 @@ const AUTH_ERROR_MAP = {
   INVALID_EMAIL_OR_PASSWORD: "Invalid email or password.",
 };
 
+const RESET_PASSWORD_ERROR_MAP = {
+  INVALID_TOKEN:
+    "This activation link is invalid or has expired. Please request a new one.",
+  PASSWORD_TOO_SHORT: "Password must be at least 8 characters long.",
+  PASSWORD_TOO_LONG: "Password must be at most 128 characters long.",
+};
+
 const errorHandler = (err, req, res, next) => {
   console.error("Error:", err);
 
@@ -45,6 +52,11 @@ const errorHandler = (err, req, res, next) => {
   // Better Auth errors
   if (AUTH_ERROR_MAP[code]) {
     return errorResponse(res, 409, AUTH_ERROR_MAP[code]);
+  }
+
+  // Better Auth reset-password / password-setup errors
+  if (RESET_PASSWORD_ERROR_MAP[code]) {
+    return errorResponse(res, 400, RESET_PASSWORD_ERROR_MAP[code]);
   }
 
   // Default

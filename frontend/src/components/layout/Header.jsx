@@ -32,6 +32,8 @@ const PAGE_TITLES = {
   // Resident
   '/resident/dashboard': 'Resident Dashboard',
   '/resident/my-complaints': 'My Complaints',
+  '/resident/complaints': 'My Complaints',
+  '/resident/complaints/new': 'Raise a Complaint',
   '/resident/notices': 'Community Notices',
   '/resident/payments': 'Maintenance Payments',
   '/resident/profile': 'My Profile',

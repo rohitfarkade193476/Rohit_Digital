@@ -46,3 +46,17 @@ export async function registerSociety(data) {
 
   return response.data;
 }
+
+/**
+ * Set a new password using a reset/activation token.
+ * @param {string} token - Token from the activation link (?token=...)
+ * @param {string} newPassword
+ * @returns {Promise<{ status: boolean }>}
+ */
+export async function resetPassword(token, newPassword) {
+  const response = await axiosInstance.post('/api/auth/reset-password', {
+    token,
+    newPassword,
+  });
+  return response.data;
+}

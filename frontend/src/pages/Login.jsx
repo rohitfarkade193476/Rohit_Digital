@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { loginSchema } from '../schemas/auth/loginSchema.js';
-import Input from '../components/Input.jsx';
-import Button from '../components/Button.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema } from "../schemas/auth/loginSchema.js";
+import Input from "../components/Input.jsx";
+import Button from "../components/Button.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { Link, useLocation } from "react-router-dom";
 /**
  * Login.jsx
  * Public login page — all roles.
@@ -19,7 +18,10 @@ export default function Login() {
   const { login, isAuthenticated, user } = useAuth();
 
   // Backend / network-level error message (separate from field validation)
-  const [serverError, setServerError] = useState('');
+  const [serverError, setServerError] = useState("");
+
+  const location = useLocation();
+  const fromActivation = location.state?.fromActivation === true;
 
   const {
     register,
@@ -27,7 +29,7 @@ export default function Login() {
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { email: "", password: "" },
   });
 
   // ── If the user is already authenticated, they should never see this page.
@@ -35,7 +37,7 @@ export default function Login() {
   //    but we keep a safety fallback here too — the AuthContext redirects on login().
 
   async function onSubmit(data) {
-    setServerError('');
+    setServerError("");
     try {
       await login({ email: data.email, password: data.password });
       // On success, AuthContext.login() navigates away — no more work needed here.
@@ -44,7 +46,7 @@ export default function Login() {
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.error ||
-        'Invalid email or password. Please try again.';
+        "Invalid email or password. Please try again.";
       setServerError(message);
     }
   }
@@ -52,7 +54,6 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-
         {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">Welcome back</h1>
@@ -87,7 +88,11 @@ export default function Login() {
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-5">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          noValidate
+          className="space-y-5"
+        >
           <Input
             id="login-email"
             label="Email address"
@@ -95,7 +100,7 @@ export default function Login() {
             placeholder="you@example.com"
             error={errors.email?.message}
             required
-            {...register('email')}
+            {...register("email")}
           />
 
           <Input
@@ -105,7 +110,7 @@ export default function Login() {
             placeholder="••••••••"
             error={errors.password?.message}
             required
-            {...register('password')}
+            {...register("password")}
           />
 
           <div className="flex items-center justify-end">
@@ -145,21 +150,21 @@ export default function Login() {
                 Signing in…
               </span>
             ) : (
-              'Sign In'
+              "Sign In"
             )}
           </Button>
+          {!fromActivation && (
+            <p className="mt-6 text-center text-sm text-gray-500">
+              Managing a new society?{" "}
+              <Link
+                to="/register-society"
+                className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+              >
+                Register here
+              </Link>
+            </p>
+          )}
         </form>
-
-        {/* Footer */}
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Managing a new society?{' '}
-          <Link
-            to="/register-society"
-            className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
-          >
-            Register here
-          </Link>
-        </p>
       </div>
     </div>
   );
