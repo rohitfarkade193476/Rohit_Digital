@@ -7,7 +7,7 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex  font-sans antialiased text-slate-900">
+    <div className="h-screen w-screen flex overflow-hidden bg-slate-50 font-sans antialiased text-slate-900">
       {/* Reusable Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
@@ -15,12 +15,12 @@ export default function DashboardLayout() {
       />
 
       {/* Main Content Area */}
-      <div className="lg:ml-64 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col h-screen min-w-0 overflow-hidden lg:ml-64">
         {/* Reusable Header */}
         <Header onMenuClick={() => setSidebarOpen(true)} />
 
-        {/* Dynamic Nested Content */}
-        <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
+        {/* Dynamic Nested Scrollable Content */}
+        <main className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
