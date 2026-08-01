@@ -12,6 +12,7 @@ const PAGE_TITLES = {
   '/super-admin/societies': 'Societies Management',
   '/super-admin/users': 'Users Directory',
   '/super-admin/reports': 'System Reports',
+  '/super-admin/profile': 'Super Admin Profile',
 
   // Society Admin
   '/society-admin/dashboard': 'Society Admin Dashboard',
@@ -22,7 +23,7 @@ const PAGE_TITLES = {
   '/society-admin/complaints': 'Complaints Management',
   '/society-admin/maintenance': 'Maintenance Records',
   '/society-admin/notices': 'Society Notices',
-  '/society-admin/profile': 'Admin Profile',
+  '/society-admin/profile': 'Society Admin Profile',
 
   // Staff
   '/staff/dashboard': 'Staff Dashboard',
@@ -36,7 +37,7 @@ const PAGE_TITLES = {
   '/resident/complaints/new': 'Raise a Complaint',
   '/resident/notices': 'Community Notices',
   '/resident/payments': 'Maintenance Payments',
-  '/resident/profile': 'My Profile',
+  '/resident/profile': 'Resident Profile',
 
   // Vendor
   '/vendor/dashboard': 'Vendor Dashboard',
@@ -55,7 +56,7 @@ export default function Header({ onMenuClick }) {
   const initial = user?.firstName?.[0]?.toUpperCase() || 'U';
 
   return (
-    <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 h-16 px-4 lg:px-8 flex items-center justify-between shadow-sm">
+    <header className="bg-white border-b border-slate-200/80 shrink-0 z-20 h-16 px-4 lg:px-8 flex items-center justify-between shadow-sm">
       {/* Left section: Hamburger button & Page Title */}
       <div className="flex items-center gap-3">
         <button
