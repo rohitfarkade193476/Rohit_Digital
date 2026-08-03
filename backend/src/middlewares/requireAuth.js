@@ -1,4 +1,5 @@
 import { auth } from "../lib/auth.js";
+import prisma from "../config/prisma.js";
 import { errorResponse } from "../utils/response.js";
 export const requireAuth = async (req, res, next) => {
   try {
@@ -14,7 +15,23 @@ export const requireAuth = async (req, res, next) => {
       );
     }
 
-    if (!session.user.isActive) {
+    // Re-fetch the user from the database so deactivation takes effect
+    // immediately. Better Auth's cookie cache can otherwise keep serving
+    // a stale (active) user object for up to its cache TTL.
+    const freshUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, isActive: true },
+    });
+
+    if (!freshUser) {
+      return errorResponse(
+        res,
+        401,
+        "Authentication required"
+      );
+    }
+
+    if (!freshUser.isActive) {
       return errorResponse(
         res,
         403,
