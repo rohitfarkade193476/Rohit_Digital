@@ -154,15 +154,26 @@ export default function Login() {
             )}
           </Button>
           {!fromActivation && (
-            <p className="mt-6 text-center text-sm text-gray-500">
-              Managing a new society?{" "}
-              <Link
-                to="/register-society"
-                className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
-              >
-                Register here
-              </Link>
-            </p>
+            <>
+              <p className="mt-6 text-center text-sm text-gray-500">
+                Managing a new society?{" "}
+                <Link
+                  to="/register-society"
+                  className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+                >
+                  Register here
+                </Link>
+              </p>
+              <p className="mt-2 text-center text-sm text-gray-500">
+                Service provider?{" "}
+                <Link
+                  to="/register-vendor"
+                  className="text-indigo-600 font-medium hover:text-indigo-800 transition-colors"
+                >
+                  Register your business
+                </Link>
+              </p>
+            </>
           )}
         </form>
       </div>
