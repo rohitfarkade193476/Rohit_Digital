@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, User, Phone, Mail, Briefcase, Building2, Calendar, ShieldCheck } from 'lucide-react';
+import { staffFormSchema } from '../../schemas/staff/staffFormSchema.js';
 
 export default function StaffFormModal({
   isOpen,
@@ -61,31 +62,17 @@ export default function StaffFormModal({
   const submitButtonText = isEdit ? 'Update Staff' : 'Save Staff';
 
   const validateForm = () => {
+    const result = staffFormSchema.safeParse(formData);
     const errors = {};
-    if (!formData.name.trim()) {
-      errors.name = 'Full name is required.';
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'Full name must be at least 2 characters.';
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        if (!errors[issue.path[0]]) {
+          errors[issue.path[0]] = issue.message;
+        }
+      }
     }
-
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required.';
-    } else if (!/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s./0-9]{7,12}$/.test(formData.phone.trim())) {
-      errors.phone = 'Enter a valid phone number (min 10 digits).';
-    }
-
-    if (!formData.email.trim()) {
-      errors.email = 'Email address is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Enter a valid email address.';
-    }
-
-    if (!formData.joiningDate) {
-      errors.joiningDate = 'Joining date is required.';
-    }
-
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return result.success;
   };
 
   const handleChange = (field, value) => {

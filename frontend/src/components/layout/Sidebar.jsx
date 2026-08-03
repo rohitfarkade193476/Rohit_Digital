@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Wrench,
   Bell,
+  BellRing,
   User,
   ClipboardList,
   CreditCard,
@@ -32,6 +33,11 @@ const ROLE_MENUS = {
     { label: "Societies", path: "/super-admin/societies", icon: Building2 },
     { label: "Users", path: "/super-admin/users", icon: Users },
     { label: "Reports", path: "/super-admin/reports", icon: FileBarChart },
+    {
+      label: "Notifications",
+      path: "/super-admin/notifications",
+      icon: BellRing,
+    },
     { label: "Profile", path: "/super-admin/profile", icon: User },
   ],
   SOCIETY_ADMIN: [
@@ -51,6 +57,11 @@ const ROLE_MENUS = {
     },
     { label: "Maintenance", path: "/society-admin/maintenance", icon: Wrench },
     { label: "Notices", path: "/society-admin/notices", icon: Bell },
+    {
+      label: "Notifications",
+      path: "/society-admin/notifications",
+      icon: BellRing,
+    },
     { label: "Profile", path: "/society-admin/profile", icon: User },
   ],
   STAFF: [
@@ -60,6 +71,11 @@ const ROLE_MENUS = {
       path: "/staff/assigned-complaints",
       icon: ClipboardList,
     },
+    {
+      label: "Notifications",
+      path: "/staff/notifications",
+      icon: BellRing,
+    },
     { label: "Profile", path: "/staff/profile", icon: User },
   ],
   RESIDENT: [
@@ -67,11 +83,21 @@ const ROLE_MENUS = {
     { label: "My Complaints", path: "/resident/complaints", icon: AlertCircle },
     { label: "Notices", path: "/resident/notices", icon: Bell },
     { label: "Payments", path: "/resident/payments", icon: CreditCard },
+    {
+      label: "Notifications",
+      path: "/resident/notifications",
+      icon: BellRing,
+    },
     { label: "Profile", path: "/resident/profile", icon: User },
   ],
   VENDOR: [
     { label: "Dashboard", path: "/vendor/dashboard", icon: LayoutDashboard },
-    { label: "Assigned Work", path: "/vendor/assigned-work", icon: Briefcase },
+    { label: "Assignments", path: "/vendor/assignments", icon: Briefcase },
+    {
+      label: "Notifications",
+      path: "/vendor/notifications",
+      icon: BellRing,
+    },
     { label: "Profile", path: "/vendor/profile", icon: User },
   ],
 };

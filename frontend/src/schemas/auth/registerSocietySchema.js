@@ -1,6 +1,9 @@
 import { z } from 'zod';
-
-const INDIAN_PHONE_REGEX = /^(?:\+91|0)?[6-9]\d{9}$/;
+import {
+  indianPhone,
+  INDIAN_PHONE_REGEX,
+  INDIAN_PHONE_ERROR_MESSAGE,
+} from '../common/phoneSchema.js';
 
 export const registerSocietySchema = z
   .object({
@@ -57,7 +60,7 @@ export const registerSocietySchema = z
       .string()
       .trim()
       .min(1, 'Contact phone is required.')
-      .regex(INDIAN_PHONE_REGEX, 'Enter a valid Indian mobile number (e.g. 9876543210).'),
+      .regex(INDIAN_PHONE_REGEX, INDIAN_PHONE_ERROR_MESSAGE),
 
     // logo is optional — handled outside Zod (file input)
 
@@ -72,11 +75,7 @@ export const registerSocietySchema = z
       .trim()
       .min(1, 'Last name is required.'),
 
-    phone: z
-      .string()
-      .trim()
-      .min(1, 'Phone number is required.')
-      .regex(INDIAN_PHONE_REGEX, 'Enter a valid Indian mobile number (e.g. 9876543210).'),
+    phone: indianPhone,
 
     email: z
       .string()
