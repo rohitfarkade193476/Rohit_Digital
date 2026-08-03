@@ -4,6 +4,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import RegisterSociety from "./pages/RegisterSociety.jsx";
 import ActivateAccount from "./pages/ActivateAccount.jsx";
+import RegisterVendor from "./pages/vendor/RegisterVendor.jsx";
+import Notifications from "./pages/Notifications.jsx";
 
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
@@ -34,13 +36,18 @@ import StaffAssignedComplaints from "./pages/staff/StaffAssignedComplaints.jsx";
 
 // Vendor Pages
 import VendorDashboard from "./components/dashboards/VendorDashboard.jsx";
-import VendorAssignedWork from "./pages/vendor/VendorAssignedWork.jsx";
+import VendorAssignments from "./pages/vendor/VendorAssignments.jsx";
+import VendorAssignmentDetail from "./pages/vendor/VendorAssignmentDetail.jsx";
+import VendorProfile from "./pages/vendor/VendorProfile.jsx";
 
 export default function App() {
   return (
     <Routes>
       {/* Public route — accessible before login (e.g. from invitation email) */}
       <Route path="/activate-account" element={<ActivateAccount />} />
+
+      {/* Public route — vendor self-registration */}
+      <Route path="/register-vendor" element={<RegisterVendor />} />
 
       {/* Guest Routes — redirect to role dashboard if already authenticated */}
       <Route element={<GuestRoute />}>
@@ -60,6 +67,7 @@ export default function App() {
           <Route path="complaints" element={<ComplaintManagement />} />
           <Route path="maintenance" element={<MaintenanceManagement />} />
           <Route path="notices" element={<Notices />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -72,6 +80,7 @@ export default function App() {
           <Route path="complaints/new" element={<RaiseComplaint />} />
           <Route path="notices" element={<Notices />} />
           <Route path="payments" element={<ResidentPayments />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -81,6 +90,7 @@ export default function App() {
         <Route path="/staff" element={<DashboardLayout />}>
           <Route path="dashboard" element={<StaffDashboard />} />
           <Route path="assigned-complaints" element={<StaffAssignedComplaints />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -89,8 +99,10 @@ export default function App() {
       <Route element={<ProtectedRoute allowedRoles={["VENDOR"]} />}>
         <Route path="/vendor" element={<DashboardLayout />}>
           <Route path="dashboard" element={<VendorDashboard />} />
-          <Route path="assigned-work" element={<VendorAssignedWork />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="assignments" element={<VendorAssignments />} />
+          <Route path="assignments/:id" element={<VendorAssignmentDetail />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="profile" element={<VendorProfile />} />
         </Route>
       </Route>
 
@@ -101,9 +113,24 @@ export default function App() {
           <Route path="societies" element={<Dashboard />} />
           <Route path="users" element={<Dashboard />} />
           <Route path="reports" element={<Dashboard />} />
+          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
+
+      {/* TEMPORARY UI TEST ROUTES - REMOVE BEFORE COMMIT */}
+<Route path="/test/vendor/dashboard" element={<VendorDashboard />} />
+<Route path="/test/vendor/assignments" element={<VendorAssignments />} />
+<Route
+  path="/test/vendor/assignments/:id"
+  element={<VendorAssignmentDetail />}
+/>
+<Route path="/test/vendor/profile" element={<VendorProfile />} />
+<Route path="/test/society-admin/vendors" element={<VendorManagement />} />
+<Route
+  path="/test/society-admin/complaints"
+  element={<ComplaintManagement />}
+/>
 
       {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />
