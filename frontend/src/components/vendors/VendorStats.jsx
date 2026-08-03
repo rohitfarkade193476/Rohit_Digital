@@ -1,40 +1,41 @@
 import React from 'react';
-import { Briefcase, UserCheck, Mail, AlertTriangle } from 'lucide-react';
+import { Briefcase, UserCheck, CheckCircle2, Tag } from 'lucide-react';
 
-export default function VendorStats({ vendorList = [] }) {
-  const total = vendorList.length;
+export default function VendorStats({ vendorList = [], total = 0 }) {
   const active = vendorList.filter((v) => v.status === 'ACTIVE').length;
-  const invited = vendorList.filter((v) => v.status === 'INVITED' || v.invitationStatus === 'Pending').length;
-  const inactive = vendorList.filter((v) => v.status === 'INACTIVE').length;
+  const available = vendorList.filter((v) => v.isAvailable).length;
+  const categories = new Set(
+    vendorList.map((v) => v.category).filter(Boolean)
+  ).size;
 
   const statCards = [
     {
-      title: 'Total Vendors',
+      title: 'Total Partners',
       value: total,
-      subtext: 'Contracted service partners',
+      subtext: 'Registered service partners',
       icon: Briefcase,
       iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-100',
     },
     {
-      title: 'Active Vendors',
+      title: 'Active Partners',
       value: active,
-      subtext: 'Available for work assignment',
+      subtext: 'Activated on the platform',
       icon: UserCheck,
       iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-100',
     },
     {
-      title: 'Pending Invitations',
-      value: invited,
-      subtext: 'Invitation email sent',
-      icon: Mail,
-      iconBg: 'bg-amber-50 text-amber-600 border-amber-100',
+      title: 'Available Now',
+      value: available,
+      subtext: 'Ready for work assignment',
+      icon: CheckCircle2,
+      iconBg: 'bg-blue-50 text-blue-600 border-blue-100',
     },
     {
-      title: 'Inactive / Suspended',
-      value: inactive,
-      subtext: 'Access currently paused',
-      icon: AlertTriangle,
-      iconBg: 'bg-slate-100 text-slate-600 border-slate-200',
+      title: 'Service Categories',
+      value: categories,
+      subtext: 'Across current results',
+      icon: Tag,
+      iconBg: 'bg-amber-50 text-amber-600 border-amber-100',
     },
   ];
 

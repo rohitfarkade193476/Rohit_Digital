@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   X,
   User,
@@ -7,36 +7,22 @@ import {
   Home,
   Wrench,
   Building2,
-  Send,
-  UserPlus,
-  CheckCircle,
-  Paperclip,
   Clock,
-  Tag
+  Tag,
+  CheckCircle2,
 } from 'lucide-react';
-import StatusTimeline from './StatusTimeline.jsx';
+import { formatDateTime } from '../../lib/format.js';
 
 export default function ComplaintDetailsDrawer({
   isOpen,
   onClose,
   complaint,
-  onAssignStaffClick,
   onAssignVendorClick,
-  onCloseComplaintClick,
-  onAddComment,
+  assignments,
+  assignmentError,
+  isLoadingAssignments,
 }) {
-  const [newComment, setNewComment] = useState('');
-
   if (!isOpen || !complaint) return null;
-
-  const handleCommentSubmit = (e) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
-    if (onAddComment) {
-      onAddComment(complaint.id, newComment.trim());
-    }
-    setNewComment('');
-  };
 
   const getPriorityBadge = (priority) => {
     const p = (priority || '').toUpperCase();
@@ -66,6 +52,10 @@ export default function ComplaintDetailsDrawer({
     }
   };
 
+  const canAssign =
+    complaint.status === 'OPEN' ||
+    complaint.status === 'IN_PROGRESS';
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
@@ -74,7 +64,7 @@ export default function ComplaintDetailsDrawer({
           <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="font-mono text-sm font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
-                {complaint.ticketId || complaint.id}
+                {complaint.id.slice(0, 8)}
               </span>
               <div className="flex items-center gap-2">
                 {getPriorityBadge(complaint.priority)}
@@ -97,7 +87,8 @@ export default function ComplaintDetailsDrawer({
                 {complaint.title}
               </h2>
               <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" /> Logged on {complaint.createdDate}
+                <Clock className="w-3.5 h-3.5" /> Logged on{' '}
+                {formatDateTime(complaint.createdAt)}
               </p>
               <p className="text-sm text-slate-600 mt-3 leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-200/60">
                 {complaint.description || 'No detailed description provided.'}
@@ -108,14 +99,6 @@ export default function ComplaintDetailsDrawer({
             <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50/60 border border-indigo-100 rounded-lg text-xs font-semibold text-indigo-700">
               <Tag className="w-4 h-4 text-indigo-500" />
               <span>Category: {complaint.category}</span>
-            </div>
-
-            {/* Status Timeline */}
-            <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm">
-              <StatusTimeline
-                currentStatus={complaint.status}
-                timelineData={complaint.timeline || []}
-              />
             </div>
 
             {/* Resident Info Card */}
@@ -130,160 +113,110 @@ export default function ComplaintDetailsDrawer({
                 </div>
                 <div className="flex items-center gap-2.5 text-slate-700">
                   <Home className="w-4 h-4 text-slate-400" />
-                  <span>Flat {complaint.flatNumber}</span>
+                  <span>
+                    Flat {complaint.flatNumber}
+                    {complaint.wing ? `, ${complaint.wing} Wing` : ''}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2.5 text-slate-600 text-xs font-mono">
                   <Phone className="w-4 h-4 text-slate-400" />
-                  <span>{complaint.residentPhone || '+91 98765 43210'}</span>
+                  <span>{complaint.residentPhone || '—'}</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-slate-600 text-xs">
                   <Mail className="w-4 h-4 text-slate-400" />
-                  <span>{complaint.residentEmail || 'resident@society.com'}</span>
+                  <span>{complaint.residentEmail || '—'}</span>
                 </div>
               </div>
             </div>
 
-            {/* Attached Images */}
+            {/* Assigned Vendor */}
+            <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                Assigned Vendor
+              </p>
+              {complaint.assignedVendor ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center text-xs">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-slate-800">
+                      {complaint.assignedVendor.companyName}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {complaint.assignedVendor.category}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 italic">
+                  No vendor assigned
+                </p>
+              )}
+            </div>
+
+            {/* Assignment History */}
             <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                <Paperclip className="w-4 h-4 text-slate-400" />
-                Attached Images
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {(complaint.images || [1, 2]).map((img, idx) => (
-                  <div
-                    key={idx}
-                    className="h-24 bg-slate-100 rounded-lg border border-slate-200 flex flex-col items-center justify-center p-2 text-center text-slate-400 hover:border-indigo-400 transition-colors cursor-pointer group"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-slate-200 group-hover:bg-indigo-100 group-hover:text-indigo-600 flex items-center justify-center mb-1">
-                      <Paperclip className="w-4 h-4" />
-                    </div>
-                    <span className="text-[11px] font-medium text-slate-500 group-hover:text-indigo-600 truncate w-full">
-                      Photo_{idx + 1}.jpg
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Assigned Personnel Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Assigned Staff */}
-              <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Assigned Staff
-                </p>
-                {complaint.assignedStaff ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold flex items-center justify-center text-xs">
-                      {complaint.assignedStaff.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{complaint.assignedStaff}</p>
-                      <p className="text-xs text-slate-400">Society Maintenance Staff</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No staff member assigned</p>
-                )}
-              </div>
-
-              {/* Assigned Vendor */}
-              <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Assigned Vendor
-                </p>
-                {complaint.assignedVendor ? (
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold flex items-center justify-center text-xs">
-                      <Building2 className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{complaint.assignedVendor}</p>
-                      <p className="text-xs text-slate-400">External Vendor Company</p>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">No vendor assigned</p>
-                )}
-              </div>
-            </div>
-
-            {/* Comments & Activity Section */}
-            <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Comments & Activity
+                Assignment History
               </h3>
 
-              {/* Existing Comments Thread */}
-              <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
-                {(complaint.comments || []).length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">No comments yet.</p>
-                ) : (
-                  complaint.comments.map((cmt, idx) => (
-                    <div key={idx} className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-slate-800">{cmt.author || 'Society Admin'}</span>
-                        <span className="text-slate-400 text-[10px]">{cmt.date || 'Just now'}</span>
-                      </div>
-                      <p className="text-slate-600">{cmt.text}</p>
-                    </div>
-                  ))
-                )}
-              </div>
+              {assignmentError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {assignmentError}
+                </p>
+              )}
 
-              {/* Add Comment Input */}
-              <form onSubmit={handleCommentSubmit} className="flex gap-2 pt-2 border-t border-slate-100">
-                <input
-                  type="text"
-                  placeholder="Add a comment or internal note..."
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-                <button
-                  type="submit"
-                  disabled={!newComment.trim()}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition-colors"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Send</span>
-                </button>
-              </form>
+              {isLoadingAssignments ? (
+                <p className="text-xs text-slate-400">
+                  Loading assignment history…
+                </p>
+              ) : !assignments || assignments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">
+                  No vendor has been assigned to this complaint yet.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {assignments.map((a) => (
+                    <div
+                      key={a.id}
+                      className="bg-slate-50 rounded-lg p-3 border border-slate-100 text-xs"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-slate-800">
+                          {a.vendor?.companyName}
+                        </span>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                          {a.status}
+                        </span>
+                      </div>
+                      <p className="text-slate-500">
+                        Assigned {formatDateTime(a.assignedAt)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Drawer Footer Actions */}
           <div className="p-4 border-t border-slate-200 bg-slate-50/70 flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              {/* Assign Staff */}
-              <button
-                onClick={() => onAssignStaffClick && onAssignStaffClick(complaint)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                <UserPlus className="w-4 h-4" />
-                <span>Assign Staff</span>
-              </button>
+            <button
+              onClick={() => onAssignVendorClick && onAssignVendorClick(complaint)}
+              disabled={!canAssign}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title={canAssign ? 'Assign an external vendor' : 'Vendor can only be assigned to open or in-progress complaints'}
+            >
+              <Wrench className="w-4 h-4" />
+              <span>Assign Vendor</span>
+            </button>
 
-              {/* Assign Vendor */}
-              <button
-                onClick={() => onAssignVendorClick && onAssignVendorClick(complaint)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                <Wrench className="w-4 h-4" />
-                <span>Assign Vendor</span>
-              </button>
-            </div>
-
-            {/* Close Complaint */}
-            {complaint.status !== 'CLOSED' && (
-              <button
-                onClick={() => onCloseComplaintClick && onCloseComplaintClick(complaint)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
-              >
-                <CheckCircle className="w-4 h-4" />
-                <span>Close Complaint</span>
-              </button>
+            {complaint.assignedVendor && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Vendor assigned: {complaint.assignedVendor.companyName}
+              </span>
             )}
           </div>
         </div>

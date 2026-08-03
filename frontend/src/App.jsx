@@ -118,20 +118,6 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* TEMPORARY UI TEST ROUTES - REMOVE BEFORE COMMIT */}
-<Route path="/test/vendor/dashboard" element={<VendorDashboard />} />
-<Route path="/test/vendor/assignments" element={<VendorAssignments />} />
-<Route
-  path="/test/vendor/assignments/:id"
-  element={<VendorAssignmentDetail />}
-/>
-<Route path="/test/vendor/profile" element={<VendorProfile />} />
-<Route path="/test/society-admin/vendors" element={<VendorManagement />} />
-<Route
-  path="/test/society-admin/complaints"
-  element={<ComplaintManagement />}
-/>
-
       {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

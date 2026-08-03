@@ -10,21 +10,13 @@ export default function ComplaintFilters({
   setSelectedStatus,
   selectedCategory = 'ALL',
   setSelectedCategory,
-  selectedStaff = 'ALL',
-  setSelectedStaff,
-  selectedVendor = 'ALL',
-  setSelectedVendor,
   onReset,
-  staffOptions = [],
-  vendorOptions = [],
 }) {
   const isFiltered =
     searchTerm ||
     selectedPriority !== 'ALL' ||
     selectedStatus !== 'ALL' ||
-    selectedCategory !== 'ALL' ||
-    selectedStaff !== 'ALL' ||
-    selectedVendor !== 'ALL';
+    selectedCategory !== 'ALL';
 
   return (
     <div className="bg-white rounded-xl p-4 lg:p-5 border border-slate-200/80 shadow-sm mb-6">
@@ -36,7 +28,7 @@ export default function ComplaintFilters({
             type="text"
             value={searchTerm}
             onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-            placeholder="Search by Complaint ID, Resident, or Flat Number..."
+            placeholder="Search by title, resident, or flat number..."
             className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
           />
         </div>
@@ -86,40 +78,6 @@ export default function ComplaintFilters({
             <option value="Security">Security</option>
             <option value="Carpentry">Carpentry</option>
             <option value="General">General</option>
-          </select>
-        </div>
-
-        {/* Assigned Staff Filter */}
-        <div>
-          <select
-            value={selectedStaff}
-            onChange={(e) => setSelectedStaff && setSelectedStaff(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-          >
-            <option value="ALL">All Staff</option>
-            <option value="UNASSIGNED">Unassigned</option>
-            {staffOptions.map((st) => (
-              <option key={st.id || st.name} value={st.name}>
-                {st.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Assigned Vendor Filter */}
-        <div>
-          <select
-            value={selectedVendor}
-            onChange={(e) => setSelectedVendor && setSelectedVendor(e.target.value)}
-            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-          >
-            <option value="ALL">All Vendors</option>
-            <option value="UNASSIGNED">Unassigned</option>
-            {vendorOptions.map((v) => (
-              <option key={v.id || v.name} value={v.name}>
-                {v.name}
-              </option>
-            ))}
           </select>
         </div>
 
