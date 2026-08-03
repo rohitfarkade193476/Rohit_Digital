@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, User, Phone, Mail, Home, Calendar, Building, ShieldCheck, AlertCircle } from 'lucide-react';
 import { getFlats } from '../../lib/flatsApi.js';
+import { residentFormSchema } from '../../schemas/resident/residentFormSchema.js';
 
 export default function ResidentFormModal({
   isOpen,
@@ -90,35 +91,17 @@ export default function ResidentFormModal({
   const submitButtonText = isEdit ? 'Update Resident' : 'Save Resident';
 
   const validateForm = () => {
+    const result = residentFormSchema.safeParse(formData);
     const errors = {};
-    if (!formData.name.trim()) {
-      errors.name = 'Resident name is required.';
-    } else if (formData.name.trim().length < 2) {
-      errors.name = 'Name must be at least 2 characters.';
+    if (!result.success) {
+      for (const issue of result.error.issues) {
+        if (!errors[issue.path[0]]) {
+          errors[issue.path[0]] = issue.message;
+        }
+      }
     }
-
-    if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required.';
-    } else if (!/^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s./0-9]{7,12}$/.test(formData.phone.trim())) {
-      errors.phone = 'Enter a valid phone number (min 10 digits).';
-    }
-
-    if (!formData.email.trim()) {
-      errors.email = 'Email address is required.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-      errors.email = 'Enter a valid email address.';
-    }
-
-    if (!formData.flatNumber.trim()) {
-      errors.flatNumber = 'Flat number is required.';
-    }
-
-    if (!formData.moveInDate) {
-      errors.moveInDate = 'Move-in date is required.';
-    }
-
     setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return result.success;
   };
 
   const handleChange = (field, value) => {

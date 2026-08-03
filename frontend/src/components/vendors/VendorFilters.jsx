@@ -1,25 +1,14 @@
 import React from 'react';
 import { Search, RotateCcw, Filter } from 'lucide-react';
 
-const CATEGORIES = [
-  'ALL',
-  'Plumbing Services',
-  'Electrical Works',
-  'Elevator Maintenance',
-  'Security Systems',
-  'Pest Control',
-  'Waste Management',
-  'Landscaping & Gardening',
-  'Civil & Painting',
-];
-
 export default function VendorFilters({
   searchTerm,
   onSearchChange,
   selectedCategory,
   setSelectedCategory,
-  selectedStatus,
-  setSelectedStatus,
+  selectedAvailability,
+  setSelectedAvailability,
+  categoryOptions = [],
   onReset,
 }) {
   return (
@@ -31,7 +20,7 @@ export default function VendorFilters({
           type="text"
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search by vendor name, service, email or phone..."
+          placeholder="Search by company, service, contact or email..."
           className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-colors"
         />
       </div>
@@ -46,24 +35,23 @@ export default function VendorFilters({
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            {CATEGORIES.map((cat) => (
+            <option value="ALL">All Categories</option>
+            {categoryOptions.map((cat) => (
               <option key={cat} value={cat}>
-                {cat === 'ALL' ? 'All Categories' : cat}
+                {cat}
               </option>
             ))}
           </select>
         </div>
 
-        {/* Status Filter */}
+        {/* Availability Filter */}
         <select
-          value={selectedStatus}
-          onChange={(e) => setSelectedStatus(e.target.value)}
+          value={selectedAvailability}
+          onChange={(e) => setSelectedAvailability(e.target.value)}
           className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
-          <option value="ALL">All Statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INVITED">Invited / Pending</option>
-          <option value="INACTIVE">Inactive</option>
+          <option value="AVAILABLE">Available for Work</option>
+          <option value="UNAVAILABLE">Currently Unavailable</option>
         </select>
 
         {/* Reset Button */}

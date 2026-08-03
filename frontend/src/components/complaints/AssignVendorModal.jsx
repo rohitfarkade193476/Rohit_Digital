@@ -1,30 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { X, Building2, CheckCircle2 } from 'lucide-react';
+import { X, Building2, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export default function AssignVendorModal({
   isOpen,
   onClose,
   complaint,
   vendorList = [],
+  isLoadingVendors = false,
   onAssign,
+  isSubmitting = false,
+  error = '',
 }) {
-  const [selectedVendorName, setSelectedVendorName] = useState('');
+  const [selectedVendorId, setSelectedVendorId] = useState('');
 
   useEffect(() => {
-    if (complaint?.assignedVendor) {
-      setSelectedVendorName(complaint.assignedVendor);
-    } else if (vendorList.length > 0) {
-      setSelectedVendorName(vendorList[0].name || vendorList[0]);
+    if (!isOpen) return;
+    if (vendorList.length > 0) {
+      setSelectedVendorId(vendorList[0].id || '');
+    } else {
+      setSelectedVendorId('');
     }
-  }, [complaint, vendorList, isOpen]);
+  }, [isOpen, vendorList]);
 
   if (!isOpen || !complaint) return null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (onAssign && selectedVendorName) {
-      onAssign(complaint.id, selectedVendorName);
-      onClose();
+    if (onAssign && selectedVendorId) {
+      onAssign(complaint.id, selectedVendorId);
     }
   };
 
@@ -40,7 +43,7 @@ export default function AssignVendorModal({
             <div>
               <h2 className="text-base font-bold text-slate-800">Assign External Vendor</h2>
               <p className="text-xs text-slate-500 font-mono">
-                {complaint.ticketId || complaint.id}
+                {complaint.id.slice(0, 8)}
               </p>
             </div>
           </div>
@@ -56,30 +59,44 @@ export default function AssignVendorModal({
         <form onSubmit={handleSubmit}>
           <div className="p-6 space-y-4">
             <p className="text-xs text-slate-600">
-              Select an external vendor service provider for complaint{' '}
-              <span className="font-semibold text-slate-800">&ldquo;{complaint.title}&rdquo;</span>.
+              Select a service partner for complaint{' '}
+              <span className="font-semibold text-slate-800">
+                &ldquo;{complaint.title}&rdquo;
+              </span>
+              . Only activated and currently available vendors are listed.
             </p>
 
-            {/* Select Dropdown */}
+            {error && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 Choose Vendor *
               </label>
-              <select
-                value={selectedVendorName}
-                onChange={(e) => setSelectedVendorName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 cursor-pointer"
-              >
-                {vendorList.map((v) => {
-                  const vendorName = v.name || v;
-                  const category = v.category ? ` (${v.category})` : '';
-                  return (
-                    <option key={v.id || vendorName} value={vendorName}>
-                      {vendorName}{category}
+              {isLoadingVendors ? (
+                <p className="text-sm text-slate-400">Loading vendors…</p>
+              ) : vendorList.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">
+                  No available vendors right now.
+                </p>
+              ) : (
+                <select
+                  value={selectedVendorId}
+                  onChange={(e) => setSelectedVendorId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 cursor-pointer"
+                >
+                  {vendorList.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.companyName || v.name}
+                      {v.category ? ` (${v.category})` : ''}
                     </option>
-                  );
-                })}
-              </select>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
 
@@ -94,11 +111,13 @@ export default function AssignVendorModal({
             </button>
             <button
               type="submit"
-              disabled={!selectedVendorName}
+              disabled={!selectedVendorId || isSubmitting}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-colors"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Assign Vendor</span>
+              <span>
+                {isSubmitting ? 'Assigning…' : 'Assign Vendor'}
+              </span>
             </button>
           </div>
         </form>
