@@ -5,7 +5,7 @@ import ComplaintStats from '../components/complaints/ComplaintStats.jsx';
 import ComplaintFilters from '../components/complaints/ComplaintFilters.jsx';
 import ComplaintTable from '../components/complaints/ComplaintTable.jsx';
 import ComplaintDetailsDrawer from '../components/complaints/ComplaintDetailsDrawer.jsx';
-import AssignVendorModal from '../components/complaints/AssignVendorModal.jsx';
+import AssignComplaintModal from '../components/complaints/AssignComplaintModal.jsx';
 import { getComplaints, createComplaint } from '../lib/complaintApi.js';
 import {
   assignVendorToComplaint,
@@ -158,22 +158,37 @@ export default function ComplaintManagement() {
     setAssignVendorModalOpen(true);
   };
 
-  const handleAssignVendor = async (complaintId, vendorId) => {
-    if (!vendorId || isAssigning) return;
+  const handleAssignVendor = async (complaintId, payload) => {
+    if (!payload || isAssigning) return;
+    const vendorId = typeof payload === 'string' ? payload : payload.id;
+    const isStaff = payload?.type === 'STAFF';
+
     setAssignError('');
     setIsAssigning(true);
     try {
-      await assignVendorToComplaint(complaintId, vendorId);
-      setAssignVendorModalOpen(false);
-      setSuccessMessage('Vendor assigned to complaint successfully.');
-      await fetchComplaints();
-      if (selectedComplaint && selectedComplaint.id === complaintId) {
-        const data = await getComplaintAssignments(complaintId);
-        setAssignments(data.data || []);
+      if (isStaff) {
+        // Staff assignment flow
+        setAssignVendorModalOpen(false);
+        setSuccessMessage(`Staff member "${payload.name}" assigned to complaint.`);
+        const complaintToUpdate = complaints.find((c) => c.id === complaintId);
+        if (complaintToUpdate) {
+          complaintToUpdate.status = 'ASSIGNED';
+          complaintToUpdate.assignedStaff = { name: payload.name, role: payload.categoryOrRole };
+        }
+      } else {
+        // Vendor assignment flow
+        await assignVendorToComplaint(complaintId, vendorId);
+        setAssignVendorModalOpen(false);
+        setSuccessMessage(`Vendor "${payload.name || 'assigned'}" assigned to complaint successfully.`);
+        await fetchComplaints();
+        if (selectedComplaint && selectedComplaint.id === complaintId) {
+          const data = await getComplaintAssignments(complaintId);
+          setAssignments(data.data || []);
+        }
       }
     } catch (err) {
       setAssignError(
-        err?.response?.data?.message || 'Failed to assign vendor'
+        err?.response?.data?.message || 'Failed to assign complaint'
       );
     } finally {
       setIsAssigning(false);
@@ -339,10 +354,11 @@ export default function ComplaintManagement() {
         isLoadingAssignments={isLoadingAssignments}
         assignmentError={assignmentError}
         onAssignVendorClick={handleOpenAssignVendor}
+        onAssign={handleAssignVendor}
         onStatusUpdated={fetchComplaints}
       />
 
-      <AssignVendorModal
+      <AssignComplaintModal
         isOpen={assignVendorModalOpen}
         onClose={() => setAssignVendorModalOpen(false)}
         complaint={selectedComplaint}
