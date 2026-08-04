@@ -53,3 +53,36 @@ export async function createComplaintWithImage(formData) {
   });
   return response.data;
 }
+
+/**
+ * Get the status-change history for a complaint.
+ * @param {string} id
+ * @returns {Promise<{ success: boolean, message: string, data: { history: object[] } }>}
+ */
+export async function getComplaintHistory(id) {
+  const response = await axiosInstance.get(`/api/complaints/${id}/history`);
+  return response.data;
+}
+
+/**
+ * Reopen a resolved/closed complaint (RESIDENT only).
+ * @param {string} id
+ * @param {object} [body] - optional { note }
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function reopenComplaint(id, body = {}) {
+  const response = await axiosInstance.post(`/api/complaints/${id}/reopen`, body);
+  return response.data;
+}
+
+/**
+ * Change complaint status directly (SOCIETY_ADMIN only).
+ * @param {string} id
+ * @param {string} status
+ * @param {string} [note]
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function changeComplaintStatus(id, status, note) {
+  const response = await axiosInstance.patch(`/api/complaints/${id}/status`, { status, note });
+  return response.data;
+}

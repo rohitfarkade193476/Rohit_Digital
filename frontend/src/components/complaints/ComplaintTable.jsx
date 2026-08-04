@@ -60,9 +60,21 @@ export default function ComplaintTable({
             OPEN
           </span>
         );
-      case 'IN_PROGRESS':
+      case 'ASSIGNED':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+            ASSIGNED
+          </span>
+        );
+      case 'ACCEPTED':
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
+            ACCEPTED
+          </span>
+        );
+      case 'IN_PROGRESS':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">
             IN PROGRESS
           </span>
         );
@@ -70,6 +82,12 @@ export default function ComplaintTable({
         return (
           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
             RESOLVED
+          </span>
+        );
+      case 'REOPENED':
+        return (
+          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-800 border border-orange-200">
+            REOPENED
           </span>
         );
       case 'CLOSED':
@@ -97,7 +115,7 @@ export default function ComplaintTable({
     );
   };
 
-  const canAssign = (c) => c.status === 'OPEN' || c.status === 'IN_PROGRESS';
+  const canAssign = (c) => c.status === 'OPEN' || c.status === 'IN_PROGRESS' || c.status === 'REOPENED';
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">

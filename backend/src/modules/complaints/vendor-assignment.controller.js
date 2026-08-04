@@ -33,6 +33,10 @@ export const assignVendorHandler = asyncHandler(async (req, res) => {
     return errorResponse(res, 409, result.message);
   }
 
+  if (result.invalidTransition) {
+    return errorResponse(res, 422, result.message);
+  }
+
   return successResponse(res, 201, "Vendor assigned to complaint successfully", result.assignment);
 });
 

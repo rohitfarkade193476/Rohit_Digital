@@ -8,9 +8,12 @@ export const ASSIGNMENT_STATUS_LABELS = {
 
 export const COMPLAINT_STATUS_LABELS = {
   OPEN: 'Open',
+  ASSIGNED: 'Assigned',
+  ACCEPTED: 'Accepted',
   IN_PROGRESS: 'In Progress',
   RESOLVED: 'Resolved',
   CLOSED: 'Closed',
+  REOPENED: 'Reopened',
 };
 
 export const PRIORITY_LABELS = {

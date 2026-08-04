@@ -1,5 +1,6 @@
 import prisma from "../../config/prisma.js";
 import { createNotification } from "../notifications/notification.service.js";
+import { recordStatusChange } from "./complaint.service.js";
 
 const ACTIVE_STATUSES = ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"];
 
@@ -9,6 +10,16 @@ const VALID_TRANSITIONS = {
   IN_PROGRESS: ["COMPLETED"],
   COMPLETED: [],
   CANCELLED: [],
+};
+
+const VALID_COMPLAINT_TRANSITIONS = {
+  OPEN: ["ASSIGNED"],
+  ASSIGNED: ["ACCEPTED", "IN_PROGRESS", "OPEN"],
+  ACCEPTED: ["IN_PROGRESS", "OPEN"],
+  IN_PROGRESS: ["RESOLVED", "REOPENED", "OPEN"],
+  RESOLVED: ["CLOSED", "REOPENED"],
+  CLOSED: ["REOPENED"],
+  REOPENED: ["ASSIGNED"],
 };
 
 const ASSIGNMENT_INCLUDE = {
@@ -119,7 +130,7 @@ export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId
 
   const complaint = await prisma.complaint.findFirst({
     where: { id: complaintId, societyId },
-    select: { id: true, title: true },
+    select: { id: true, title: true, status: true },
   });
   if (!complaint) return { notFound: true };
 
@@ -155,14 +166,43 @@ export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId
     };
   }
 
-  const assignment = await prisma.vendorAssignment.create({
-    data: {
-      vendorId,
-      societyId,
-      complaintId,
-      assignedById: adminUserId,
-      status: "ASSIGNED",
-    },
+  if (!VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes("ASSIGNED")) {
+    return {
+      invalidTransition: true,
+      message: `Cannot assign vendor to a complaint in ${complaint.status} status`,
+    };
+  }
+
+  const assignment = await prisma.$transaction(async (tx) => {
+    const a = await tx.vendorAssignment.create({
+      data: {
+        vendorId,
+        societyId,
+        complaintId,
+        assignedById: adminUserId,
+        status: "ASSIGNED",
+      },
+    });
+
+    await tx.complaint.update({
+      where: { id: complaintId },
+      data: { status: "ASSIGNED" },
+    });
+
+    await tx.complaintStatusHistory.create({
+      data: {
+        complaintId,
+        status: "ASSIGNED",
+        changedById: adminUserId,
+        note: `Assigned to ${vendor.companyName}`,
+      },
+    });
+
+    return a;
+  });
+
+  const fullAssignment = await prisma.vendorAssignment.findUnique({
+    where: { id: assignment.id },
     include: ASSIGNMENT_INCLUDE,
   });
 
@@ -179,7 +219,7 @@ export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId
     console.error("Failed to create vendor assignment notification:", error);
   }
 
-  return { assignment: mapAssignment(assignment) };
+  return { assignment: mapAssignment(fullAssignment) };
 };
 
 export const getComplaintAssignments = async (complaintId, adminUserId) => {
@@ -250,6 +290,24 @@ export const updateVendorAssignmentStatus = async (
     };
   }
 
+  // Pre-check complaint status transition before entering the transaction.
+  if (status === "ACCEPTED" || status === "COMPLETED" || status === "CANCELLED") {
+    const complaint = await prisma.complaint.findUnique({
+      where: { id: assignment.complaintId },
+      select: { status: true },
+    });
+    const targetComplaintStatus =
+      status === "ACCEPTED" ? "IN_PROGRESS" :
+      status === "COMPLETED" ? "RESOLVED" : "OPEN";
+
+    if (!VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes(targetComplaintStatus)) {
+      return {
+        invalidTransition: true,
+        message: `Cannot change complaint status from ${complaint.status} to ${targetComplaintStatus}`,
+      };
+    }
+  }
+
   const data = { status };
   if (status === "ACCEPTED") data.acceptedAt = new Date();
   if (status === "IN_PROGRESS") data.startedAt = new Date();
@@ -260,22 +318,43 @@ export const updateVendorAssignmentStatus = async (
     const updatedAssignment = await tx.vendorAssignment.update({
       where: { id: assignmentId },
       data,
-      include: ASSIGNMENT_INCLUDE,
     });
 
+    let complaintStatusResult;
     if (status === "ACCEPTED") {
-      await tx.complaint.update({
-        where: { id: assignment.complaintId },
-        data: { status: "IN_PROGRESS" },
-      });
+      complaintStatusResult = await recordStatusChange(
+        tx,
+        assignment.complaintId,
+        "IN_PROGRESS",
+        userId,
+        "Vendor accepted the assignment"
+      );
     } else if (status === "COMPLETED") {
-      await tx.complaint.update({
-        where: { id: assignment.complaintId },
-        data: { status: "RESOLVED" },
-      });
+      complaintStatusResult = await recordStatusChange(
+        tx,
+        assignment.complaintId,
+        "RESOLVED",
+        userId,
+        "Work completed by vendor"
+      );
+    } else if (status === "CANCELLED") {
+      complaintStatusResult = await recordStatusChange(
+        tx,
+        assignment.complaintId,
+        "OPEN",
+        userId,
+        "Vendor assignment cancelled"
+      );
     }
 
-    return updatedAssignment;
+    if (complaintStatusResult?.invalidTransition) {
+      throw new Error(complaintStatusResult.message);
+    }
+
+    return await tx.vendorAssignment.findUnique({
+      where: { id: assignmentId },
+      include: ASSIGNMENT_INCLUDE,
+    });
   });
 
   return { assignment: mapAssignment(updated) };
