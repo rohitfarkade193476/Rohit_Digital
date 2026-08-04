@@ -30,6 +30,14 @@ const RESET_PASSWORD_ERROR_MAP = {
 const errorHandler = (err, req, res, next) => {
   console.error("Error:", err);
 
+  // Multer errors
+  if (err.code === "LIMIT_FILE_SIZE") {
+    return errorResponse(res, 422, "Image must be 5 MB or smaller");
+  }
+  if (err.code === "LIMIT_UNEXPECTED_FILE" || err.message?.includes("Only ")) {
+    return errorResponse(res, 422, err.message);
+  }
+
   const code = err.code || err.body?.code;
 
   console.log("Middleware received code:", code);

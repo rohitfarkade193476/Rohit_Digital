@@ -214,6 +214,7 @@ model Complaint {
   category    String
   priority    ComplaintPriority @default(MEDIUM)
   status      ComplaintStatus   @default(OPEN)
+  imageUrl    String?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
 

@@ -11,7 +11,11 @@ import {
 import asyncHandler from "../../utils/asyncHandler.js";
 
 export const createComplaintHandler = asyncHandler(async (req, res) => {
-  const result = await createComplaint(req.user, req.body);
+  const data = { ...req.body };
+  if (req.file) {
+    data.imageUrl = `/uploads/complaints/${req.file.filename}`;
+  }
+  const result = await createComplaint(req.user, data);
 
   if (result.forbidden) {
     return errorResponse(res, 403, "Forbidden");

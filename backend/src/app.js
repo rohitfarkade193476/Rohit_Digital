@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
+import path from "path";
+import { fileURLToPath } from "url";
 import { env } from "./config/env.js";
 
 import { auth } from "./lib/auth.js";
@@ -30,6 +32,9 @@ app.all("/api/auth/{*any}", toNodeHandler(auth));
 app.use(express.json());
 app.use(cookieParser());
 app.use(morgan("dev"));
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+app.use("/uploads", express.static(path.join(__dirname, "..", "uploads")));
 
 // app.options("/api/auth/{*any}", cors({
 //   origin: env.FRONTEND_URL,
