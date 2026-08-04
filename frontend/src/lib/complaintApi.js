@@ -41,3 +41,15 @@ export async function createComplaint(data) {
   const response = await axiosInstance.post('/api/complaints', data);
   return response.data;
 }
+
+/**
+ * Create a complaint with an image attachment (multipart/form-data).
+ * @param {FormData} formData - must include at minimum: title, category, priority. May include: image
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function createComplaintWithImage(formData) {
+  const response = await axiosInstance.post('/api/complaints', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}

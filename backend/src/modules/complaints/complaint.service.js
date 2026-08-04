@@ -43,6 +43,7 @@ const mapComplaint = (complaint) => {
     category: complaint.category,
     priority: complaint.priority,
     status: complaint.status,
+    imageUrl: complaint.imageUrl || null,
     residentId: complaint.residentId,
     residentName: resident?.user.name || "",
     residentPhone: resident?.user.phone || "",
@@ -129,6 +130,7 @@ export const createComplaint = async (user, data) => {
       category: data.category,
       priority: data.priority || "MEDIUM",
       status: "OPEN",
+      imageUrl: data.imageUrl || null,
     },
     include: COMPLAINT_INCLUDE,
   });
