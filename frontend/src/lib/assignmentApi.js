@@ -49,6 +49,20 @@ export async function assignVendorToComplaint(complaintId, vendorId) {
 }
 
 /**
+ * Society Admin assigns a staff member to a complaint.
+ * @param {string} complaintId
+ * @param {string} staffId
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function assignStaffToComplaint(complaintId, staffId) {
+  const response = await axiosInstance.post(
+    `/api/complaints/${complaintId}/assign-staff`,
+    { staffId }
+  );
+  return response.data;
+}
+
+/**
  * Fetch the assignment history of a complaint (Society Admin).
  * @param {string} complaintId
  * @returns {Promise<{ success: boolean, message: string, data: { assignments: object[] } }>}

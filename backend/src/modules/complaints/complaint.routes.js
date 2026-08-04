@@ -4,6 +4,7 @@ import { requireRole } from "../../middlewares/requireRole.js";
 import { validate } from "../../middlewares/validate.js";
 import { createComplaintValidation } from "./validators/createComplaint.validator.js";
 import { assignVendorValidation } from "./validators/assignVendor.validator.js";
+import { assignStaffValidation } from "./validators/assignStaff.validator.js";
 import uploadComplaintImage from "../../middlewares/complaintUpload.middleware.js";
 import {
   createComplaintHandler,
@@ -17,6 +18,7 @@ import {
   assignVendorHandler,
   getComplaintAssignmentsHandler,
 } from "./vendor-assignment.controller.js";
+import { assignStaffHandler } from "./staff-assignment.controller.js";
 
 const router = Router();
 
@@ -60,6 +62,15 @@ router.post(
   assignVendorValidation,
   validate,
   assignVendorHandler,
+);
+
+router.post(
+  "/:id/assign-staff",
+  requireAuth,
+  requireRole("SOCIETY_ADMIN"),
+  assignStaffValidation,
+  validate,
+  assignStaffHandler,
 );
 
 router.get(

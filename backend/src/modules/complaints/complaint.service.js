@@ -26,6 +26,25 @@ const COMPLAINT_INCLUDE = {
     },
     orderBy: { createdAt: "desc" },
   },
+  staffAssignments: {
+    select: {
+      id: true,
+      status: true,
+      assignedAt: true,
+      acceptedAt: true,
+      completedAt: true,
+      cancelledAt: true,
+      staff: {
+        select: {
+          id: true,
+          role: true,
+          department: true,
+          user: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  },
   statusHistory: {
     select: {
       id: true,
@@ -58,6 +77,10 @@ const mapComplaint = (complaint) => {
     ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"].includes(a.status)
   );
 
+  const activeStaffAssignment = complaint.staffAssignments?.find((a) =>
+    ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"].includes(a.status)
+  );
+
   return {
     id: complaint.id,
     title: complaint.title,
@@ -80,6 +103,15 @@ const mapComplaint = (complaint) => {
           status: activeAssignment.status,
         }
       : null,
+    assignedStaff: activeStaffAssignment
+      ? {
+          id: activeStaffAssignment.staff.id,
+          name: activeStaffAssignment.staff.user.name,
+          role: activeStaffAssignment.staff.role,
+          department: activeStaffAssignment.staff.department,
+          status: activeStaffAssignment.status,
+        }
+      : null,
     vendorAssignments: (complaint.vendorAssignments || []).map((a) => ({
       id: a.id,
       status: a.status,
@@ -91,6 +123,20 @@ const mapComplaint = (complaint) => {
         id: a.vendor.id,
         companyName: a.vendor.companyName,
         category: a.vendor.category,
+      },
+    })),
+    staffAssignments: (complaint.staffAssignments || []).map((a) => ({
+      id: a.id,
+      status: a.status,
+      assignedAt: a.assignedAt,
+      acceptedAt: a.acceptedAt,
+      completedAt: a.completedAt,
+      cancelledAt: a.cancelledAt,
+      staff: {
+        id: a.staff.id,
+        name: a.staff.user.name,
+        role: a.staff.role,
+        department: a.staff.department,
       },
     })),
     statusHistory: (complaint.statusHistory || []).map((h) => ({

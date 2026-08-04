@@ -93,6 +93,7 @@ model Society {
   staff             Staff[]
   complaints        Complaint[]
   vendorAssignments VendorAssignment[]
+  staffAssignments  StaffAssignment[]
 
   @@index([societyCode])
   @@index([status])
@@ -123,6 +124,7 @@ model User {
   sessions            Session[]
   accounts            Account[]
   assignedAssignments VendorAssignment[]       @relation("AssignmentAssignedBy")
+  assignedStaffAssignments StaffAssignment[]   @relation("StaffAssignmentAssignedBy")
   statusChanges       ComplaintStatusHistory[]
   notifications       Notification[]
 
@@ -180,6 +182,8 @@ model Staff {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
 
+  assignments StaffAssignment[]
+
   @@index([societyId])
   @@index([userId])
 }
@@ -226,6 +230,7 @@ model Complaint {
   resident          Resident                 @relation(fields: [residentId], references: [id], onDelete: Cascade)
   flat              Flat                     @relation(fields: [flatId], references: [id], onDelete: Cascade)
   vendorAssignments VendorAssignment[]
+  staffAssignments  StaffAssignment[]
   statusHistory     ComplaintStatusHistory[]
 
   @@index([societyId])
@@ -269,6 +274,32 @@ model VendorAssignment {
   assignedBy User?     @relation("AssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
 
   @@index([vendorId])
+  @@index([societyId])
+  @@index([complaintId])
+  @@index([status])
+}
+
+model StaffAssignment {
+  id           String           @id @default(cuid())
+  staffId      String
+  societyId    String
+  complaintId  String
+  assignedById String?
+  status       AssignmentStatus @default(ASSIGNED)
+  assignedAt   DateTime         @default(now())
+  acceptedAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  staff      Staff     @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  society    Society   @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  complaint  Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  assignedBy User?     @relation("StaffAssignmentAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  @@index([staffId])
   @@index([societyId])
   @@index([complaintId])
   @@index([status])

@@ -1,6 +1,7 @@
 import prisma from "../../config/prisma.js";
 import { createNotification } from "../notifications/notification.service.js";
 import { recordStatusChange } from "./complaint.service.js";
+import { getComplaintStaffAssignments } from "./staff-assignment.service.js";
 
 const ACTIVE_STATUSES = ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"];
 
@@ -59,6 +60,7 @@ const ASSIGNMENT_INCLUDE = {
 
 const mapAssignment = (assignment) => ({
   id: assignment.id,
+  type: "VENDOR",
   status: assignment.status,
   assignedAt: assignment.assignedAt,
   acceptedAt: assignment.acceptedAt,
@@ -232,13 +234,23 @@ export const getComplaintAssignments = async (complaintId, adminUserId) => {
   });
   if (!complaint) return { notFound: true };
 
-  const assignments = await prisma.vendorAssignment.findMany({
-    where: { complaintId },
-    include: ASSIGNMENT_INCLUDE,
-    orderBy: { createdAt: "desc" },
-  });
+  const [vendorAssignments, staffResult] = await Promise.all([
+    prisma.vendorAssignment.findMany({
+      where: { complaintId },
+      include: ASSIGNMENT_INCLUDE,
+      orderBy: { createdAt: "desc" },
+    }),
+    getComplaintStaffAssignments(complaintId, adminUserId),
+  ]);
 
-  return { assignments: assignments.map(mapAssignment) };
+  const assignments = [
+    ...vendorAssignments.map(mapAssignment),
+    ...(staffResult?.assignments || []),
+  ].sort(
+    (a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()
+  );
+
+  return { assignments };
 };
 
 export const listVendorAssignments = async (userId) => {

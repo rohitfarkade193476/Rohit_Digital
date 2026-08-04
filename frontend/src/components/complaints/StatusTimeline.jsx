@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Lock,
   RotateCcw,
-  Eye,
   Check,
   Circle,
   UserCheck,
@@ -17,7 +16,6 @@ import { COMPLAINT_STATUS_LABELS, formatDateTime } from '../../lib/format.js';
 // Status icons configuration
 const STATUS_ICONS = {
   OPEN: Clock,
-  ACKNOWLEDGED: Eye,
   ASSIGNED: UserPlus,
   ACCEPTED: CheckCircle,
   IN_PROGRESS: PlayCircle,
@@ -29,7 +27,6 @@ const STATUS_ICONS = {
 // Custom human-readable labels for Flipkart-style tracking
 const DISPLAY_LABELS = {
   OPEN: 'Complaint Created',
-  ACKNOWLEDGED: 'Acknowledged',
   ASSIGNED: 'Assigned',
   ACCEPTED: 'Accepted',
   IN_PROGRESS: 'In Progress',
@@ -41,7 +38,6 @@ const DISPLAY_LABELS = {
 // Standard lifecycle flow
 const STANDARD_FLOW = [
   'OPEN',
-  'ACKNOWLEDGED',
   'ASSIGNED',
   'ACCEPTED',
   'IN_PROGRESS',
