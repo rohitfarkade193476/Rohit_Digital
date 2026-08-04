@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import StatusTimeline from '../../components/complaints/StatusTimeline.jsx';
 import ComplaintDetailsDrawer from '../../components/complaints/ComplaintDetailsDrawer.jsx';
+import ResolveComplaintModal from '../../components/complaints/ResolveComplaintModal.jsx';
 import { getComplaints, changeComplaintStatus } from '../../lib/complaintApi.js';
 
 const INITIAL_ASSIGNED_COMPLAINTS = [
@@ -78,8 +79,11 @@ export default function StaffAssignedComplaints() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [toastMessage, setToastMessage] = useState('');
+
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [resolvingComplaint, setResolvingComplaint] = useState(null);
 
   // Attempt to load live backend complaints if available
   useEffect(() => {
@@ -90,7 +94,7 @@ export default function StaffAssignedComplaints() {
           setComplaints(res.data.complaints);
         }
       } catch (err) {
-        // Fallback to initial assigned mock complaints if backend endpoint restricts staff
+        // Fallback to initial assigned mock complaints
       }
     }
     loadLiveComplaints();
@@ -111,10 +115,8 @@ export default function StaffAssignedComplaints() {
 
   const handleUpdateStatus = async (complaintId, nextStatus, defaultNote) => {
     try {
-      // Try backend call
       await changeComplaintStatus(complaintId, nextStatus, defaultNote);
     } catch (err) {
-      // Backend may require staff integration endpoint - update locally and inform
       console.log('Backend staff transition fallback used:', err?.message);
     }
 
@@ -139,23 +141,41 @@ export default function StaffAssignedComplaints() {
 
     setToastMessage(`Complaint ${complaintId} updated to ${nextStatus.replace('_', ' ')}.`);
     setTimeout(() => setToastMessage(''), 3500);
+  };
 
-    if (selectedComplaint && selectedComplaint.id === complaintId) {
-      setSelectedComplaint((prev) => ({
-        ...prev,
-        status: nextStatus,
-        statusHistory: [
-          ...(prev.statusHistory || []),
-          {
-            id: `hist-${Date.now()}`,
-            status: nextStatus,
-            note: defaultNote,
-            createdAt: new Date().toISOString(),
-            changedBy: { name: 'Staff User', role: 'STAFF' },
-          },
-        ],
-      }));
-    }
+  const handleOpenResolveModal = (c) => {
+    setResolvingComplaint(c);
+    setResolveModalOpen(true);
+  };
+
+  const handleResolveSubmit = (complaintId, resolutionData) => {
+    setResolveModalOpen(false);
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id === complaintId) {
+          const newHistory = [
+            ...(c.statusHistory || []),
+            {
+              id: `hist-${Date.now()}`,
+              status: 'RESOLVED',
+              note: resolutionData.resolutionNote,
+              createdAt: new Date().toISOString(),
+              changedBy: { name: 'Staff User', role: 'STAFF' },
+            },
+          ];
+          return {
+            ...c,
+            status: 'RESOLVED',
+            resolutionImage: resolutionData.imagePreviewUrl,
+            resolutionNote: resolutionData.resolutionNote,
+            statusHistory: newHistory,
+          };
+        }
+        return c;
+      })
+    );
+    setToastMessage(`Complaint ${complaintId} resolved with evidence.`);
+    setTimeout(() => setToastMessage(''), 3500);
   };
 
   const openComplaintDrawer = (c) => {
@@ -290,10 +310,10 @@ export default function StaffAssignedComplaints() {
                       )}
                       {c.status === 'IN_PROGRESS' && (
                         <button
-                          onClick={() => handleUpdateStatus(c.id, 'RESOLVED', 'Work completed by staff')}
+                          onClick={() => handleOpenResolveModal(c)}
                           className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
                         >
-                          Mark Resolved
+                          Resolve Complaint
                         </button>
                       )}
 
@@ -313,11 +333,20 @@ export default function StaffAssignedComplaints() {
         </div>
       </div>
 
-      {/* Complaint Detail & Flipkart-Style Timeline Drawer */}
+      {/* Complaint Detail & Status Timeline Drawer */}
       <ComplaintDetailsDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         complaint={selectedComplaint}
+        onResolve={handleResolveSubmit}
+      />
+
+      {/* Resolve Complaint Modal */}
+      <ResolveComplaintModal
+        isOpen={resolveModalOpen}
+        onClose={() => setResolveModalOpen(false)}
+        complaint={resolvingComplaint}
+        onResolve={handleResolveSubmit}
       />
     </div>
   );

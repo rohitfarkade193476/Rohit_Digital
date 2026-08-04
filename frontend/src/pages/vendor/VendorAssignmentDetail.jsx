@@ -24,6 +24,7 @@ import {
 } from '../../lib/format.js';
 import AssignmentStatusBadge from '../../components/vendor/AssignmentStatusBadge.jsx';
 import StatusTimeline from '../../components/complaints/StatusTimeline.jsx';
+import ResolveComplaintModal from '../../components/complaints/ResolveComplaintModal.jsx';
 
 export default function VendorAssignmentDetail() {
   const { id } = useParams();
@@ -35,6 +36,7 @@ export default function VendorAssignmentDetail() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [actionError, setActionError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
 
   const fetchAssignment = useCallback(async () => {
     try {
@@ -56,6 +58,11 @@ export default function VendorAssignmentDetail() {
   }, [fetchAssignment]);
 
   const handleStatusChange = async (status) => {
+    if (status === 'COMPLETED') {
+      setResolveModalOpen(true);
+      return;
+    }
+
     if (!assignment || isUpdating) return;
     setActionError('');
     setSuccessMessage('');
@@ -72,6 +79,26 @@ export default function VendorAssignmentDetail() {
       setActionError(
         err?.response?.data?.message || 'Could not update assignment status.'
       );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleResolveSubmit = async (complaintId, resolutionData) => {
+    setResolveModalOpen(false);
+    setIsUpdating(true);
+    setActionError('');
+    try {
+      await updateMyAssignmentStatus(assignment.id, 'COMPLETED');
+      if (assignment?.complaint) {
+        assignment.complaint.resolutionImage = resolutionData.imagePreviewUrl;
+        assignment.complaint.resolutionNote = resolutionData.resolutionNote;
+      }
+      setSuccessMessage('Assignment completed with resolution evidence.');
+      setTimeout(() => setSuccessMessage(''), 4000);
+      fetchAssignment();
+    } catch (err) {
+      setActionError(err?.response?.data?.message || 'Failed to complete assignment.');
     } finally {
       setIsUpdating(false);
     }
@@ -146,7 +173,7 @@ export default function VendorAssignmentDetail() {
       case 'IN_PROGRESS':
         return [
           {
-            label: 'Mark as Completed',
+            label: 'Resolve & Mark Completed',
             icon: CheckCircle2,
             className: 'bg-emerald-600 hover:bg-emerald-700 text-white',
             status: 'COMPLETED',
@@ -302,6 +329,14 @@ export default function VendorAssignmentDetail() {
           })}
         </div>
       )}
+
+      {/* Resolve Evidence Modal */}
+      <ResolveComplaintModal
+        isOpen={resolveModalOpen}
+        onClose={() => setResolveModalOpen(false)}
+        complaint={complaint}
+        onResolve={handleResolveSubmit}
+      />
     </div>
   );
 }
