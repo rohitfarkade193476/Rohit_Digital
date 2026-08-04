@@ -11,47 +11,13 @@ import {
   Loader2,
 } from 'lucide-react';
 
-const DEFAULT_STAFF = [
-  {
-    id: 'staff-1',
-    name: 'Ramesh Kumar',
-    role: 'Electrician',
-    department: 'Maintenance',
-    phone: '+91 98123 45678',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'staff-2',
-    name: 'Vijay Singh',
-    role: 'Plumber',
-    department: 'Maintenance',
-    phone: '+91 98456 78901',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'staff-3',
-    name: 'Mohan Lal',
-    role: 'General Technician',
-    department: 'Maintenance',
-    phone: '+91 98345 67890',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'staff-4',
-    name: 'Sunita Sharma',
-    role: 'Supervisor',
-    department: 'Management',
-    phone: '+91 98234 56789',
-    status: 'ACTIVE',
-  },
-];
-
 export default function AssignComplaintModal({
   isOpen,
   onClose,
   complaint,
-  staffList = DEFAULT_STAFF,
+  staffList = [],
   vendorList = [],
+  isLoadingStaff = false,
   isLoadingVendors = false,
   onAssign,
   isSubmitting = false,
@@ -234,7 +200,11 @@ export default function AssignComplaintModal({
               </label>
 
               {assigneeType === 'STAFF' ? (
-                filteredStaff.length === 0 ? (
+                isLoadingStaff ? (
+                  <div className="flex items-center justify-center py-6 text-slate-400 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading staff...
+                  </div>
+                ) : filteredStaff.length === 0 ? (
                   <p className="text-xs text-slate-400 italic py-4 text-center">
                     No matching staff members found.
                   </p>

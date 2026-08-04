@@ -16,7 +16,6 @@ import {
   Loader2,
   FileText,
   History,
-  Eye,
   Check,
   Shield,
   ThumbsUp,
@@ -40,6 +39,10 @@ export default function ComplaintDetailsDrawer({
   assignmentError = '',
   isLoadingAssignments = false,
   onStatusUpdated,
+  staffList = [],
+  vendorList = [],
+  isLoadingStaff = false,
+  isLoadingVendors = false,
 }) {
   const { user } = useAuth();
   const role = user?.role || 'RESIDENT';
@@ -77,8 +80,6 @@ export default function ComplaintDetailsDrawer({
     switch (s) {
       case 'OPEN':
         return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">OPEN</span>;
-      case 'ACKNOWLEDGED':
-        return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 border border-sky-200">ACKNOWLEDGED</span>;
       case 'ASSIGNED':
         return <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">ASSIGNED</span>;
       case 'ACCEPTED':
@@ -99,11 +100,9 @@ export default function ComplaintDetailsDrawer({
   const isStaffOrVendor = role === 'STAFF' || role === 'VENDOR';
   const isResident = role === 'RESIDENT';
 
-  const canAcknowledge = isAdmin && currentStatus === 'OPEN';
-
   const canAssign =
     isAdmin &&
-    ['OPEN', 'ACKNOWLEDGED', 'REOPENED', 'IN_PROGRESS'].includes(currentStatus);
+    ['OPEN', 'REOPENED'].includes(currentStatus);
 
   const canAccept = isStaffOrVendor && currentStatus === 'ASSIGNED';
   const canStartWork = isStaffOrVendor && currentStatus === 'ACCEPTED';
@@ -113,23 +112,6 @@ export default function ComplaintDetailsDrawer({
   const canReopen = isResident && (currentStatus === 'RESOLVED' || currentStatus === 'CLOSED');
 
   // ── Action Handlers ────────────────────────────────────────────────────────
-  const handleAcknowledge = async () => {
-    setActionError('');
-    setActionSuccess('');
-    setIsActionLoading(true);
-    try {
-      await changeComplaintStatus(complaint.id, 'ACKNOWLEDGED', 'Acknowledged by Society Admin');
-      setActionSuccess('Complaint acknowledged successfully.');
-      if (onStatusUpdated) onStatusUpdated();
-    } catch (err) {
-      // Graceful fallback
-      setActionSuccess('Complaint marked as Acknowledged.');
-      complaint.status = 'ACKNOWLEDGED';
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
   const handleCloseComplaint = async () => {
     setActionError('');
     setActionSuccess('');
@@ -404,7 +386,7 @@ export default function ComplaintDetailsDrawer({
                                 {a.vendor?.companyName || a.staff?.name || 'Assignee'}
                               </span>
                               <span className="text-[10px] text-slate-400">
-                                Assigned {formatDateTime(a.assignedAt)}
+                                {a.type === 'STAFF' ? 'Staff' : 'Vendor'} • Assigned {formatDateTime(a.assignedAt)}
                               </span>
                             </div>
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700 border border-purple-200">
@@ -476,22 +458,6 @@ export default function ComplaintDetailsDrawer({
               {/* Action Buttons Row */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
                 <div className="flex items-center gap-2 flex-wrap">
-                  {/* Admin: Acknowledge */}
-                  {canAcknowledge && (
-                    <button
-                      onClick={handleAcknowledge}
-                      disabled={isActionLoading}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {isActionLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Eye className="w-4 h-4" />
-                      )}
-                      <span>Acknowledge Complaint</span>
-                    </button>
-                  )}
-
                   {/* Admin: Dual Assign (Staff or Vendor) */}
                   {canAssign && (
                     <button
@@ -589,6 +555,10 @@ export default function ComplaintDetailsDrawer({
         isOpen={assignModalOpen}
         onClose={() => setAssignModalOpen(false)}
         complaint={complaint}
+        staffList={staffList}
+        vendorList={vendorList}
+        isLoadingStaff={isLoadingStaff}
+        isLoadingVendors={isLoadingVendors}
         onAssign={handleAssignSubmit}
       />
 

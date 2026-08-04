@@ -1,22 +1,21 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Plus, Download, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 import ComplaintStats from '../components/complaints/ComplaintStats.jsx';
 import ComplaintFilters from '../components/complaints/ComplaintFilters.jsx';
 import ComplaintTable from '../components/complaints/ComplaintTable.jsx';
 import ComplaintDetailsDrawer from '../components/complaints/ComplaintDetailsDrawer.jsx';
 import AssignComplaintModal from '../components/complaints/AssignComplaintModal.jsx';
-import { getComplaints, createComplaint } from '../lib/complaintApi.js';
+import { getComplaints } from '../lib/complaintApi.js';
 import {
   assignVendorToComplaint,
+  assignStaffToComplaint,
   getComplaintAssignments,
 } from '../lib/assignmentApi.js';
 import { getAllVendors } from '../lib/vendorApi.js';
-import { getResidents } from '../lib/residentApi.js';
+import { getAllStaff } from '../lib/staffApi.js';
 
 const PAGE_SIZE = 10;
-
-const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'EMERGENCY'];
 
 export default function ComplaintManagement() {
   const [complaints, setComplaints] = useState([]);
@@ -42,20 +41,10 @@ export default function ComplaintManagement() {
   const [assignVendorModalOpen, setAssignVendorModalOpen] = useState(false);
   const [vendors, setVendors] = useState([]);
   const [isLoadingVendors, setIsLoadingVendors] = useState(false);
+  const [staff, setStaff] = useState([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
-
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [residents, setResidents] = useState([]);
-  const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
-  const [newComplaintForm, setNewComplaintForm] = useState({
-    title: '',
-    residentId: '',
-    category: 'Plumbing',
-    priority: 'MEDIUM',
-    description: '',
-  });
 
   // Debounce search input
   useEffect(() => {
@@ -113,6 +102,23 @@ export default function ComplaintManagement() {
     fetchVendors();
   }, [fetchVendors]);
 
+  // Load assignable staff once (for the Assign Staff tab)
+  const fetchStaff = useCallback(async () => {
+    try {
+      setIsLoadingStaff(true);
+      const data = await getAllStaff({ page: 1, limit: 100 });
+      setStaff(data.data?.staff || []);
+    } catch (err) {
+      setStaff([]);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchStaff();
+  }, [fetchStaff]);
+
   // Client-side search on the current page (backend has no search param)
   const filteredComplaints = useMemo(() => {
     const term = debouncedSearch.trim().toLowerCase();
@@ -158,33 +164,27 @@ export default function ComplaintManagement() {
     setAssignVendorModalOpen(true);
   };
 
-  const handleAssignVendor = async (complaintId, payload) => {
+  const handleAssign = async (complaintId, payload) => {
     if (!payload || isAssigning) return;
-    const vendorId = typeof payload === 'string' ? payload : payload.id;
+    const assigneeId = typeof payload === 'string' ? payload : payload.id;
     const isStaff = payload?.type === 'STAFF';
 
     setAssignError('');
     setIsAssigning(true);
     try {
       if (isStaff) {
-        // Staff assignment flow
+        await assignStaffToComplaint(complaintId, assigneeId);
         setAssignVendorModalOpen(false);
         setSuccessMessage(`Staff member "${payload.name}" assigned to complaint.`);
-        const complaintToUpdate = complaints.find((c) => c.id === complaintId);
-        if (complaintToUpdate) {
-          complaintToUpdate.status = 'ASSIGNED';
-          complaintToUpdate.assignedStaff = { name: payload.name, role: payload.categoryOrRole };
-        }
       } else {
-        // Vendor assignment flow
-        await assignVendorToComplaint(complaintId, vendorId);
+        await assignVendorToComplaint(complaintId, assigneeId);
         setAssignVendorModalOpen(false);
         setSuccessMessage(`Vendor "${payload.name || 'assigned'}" assigned to complaint successfully.`);
-        await fetchComplaints();
-        if (selectedComplaint && selectedComplaint.id === complaintId) {
-          const data = await getComplaintAssignments(complaintId);
-          setAssignments(data.data || []);
-        }
+      }
+      await fetchComplaints();
+      if (selectedComplaint && selectedComplaint.id === complaintId) {
+        const data = await getComplaintAssignments(complaintId);
+        setAssignments(data.data || []);
       }
     } catch (err) {
       setAssignError(
@@ -195,58 +195,14 @@ export default function ComplaintManagement() {
     }
   };
 
-  const handleCreateComplaint = async (e) => {
-    e.preventDefault();
-    if (isCreating) return;
-    setCreateError('');
-    setIsCreating(true);
-    try {
-      await createComplaint({
-        title: newComplaintForm.title.trim(),
-        description: newComplaintForm.description.trim() || undefined,
-        category: newComplaintForm.category,
-        priority: newComplaintForm.priority,
-        residentId: newComplaintForm.residentId,
-      });
-      setCreateModalOpen(false);
-      setSuccessMessage('Complaint created successfully.');
-      setNewComplaintForm({
-        title: '',
-        residentId: '',
-        category: 'Plumbing',
-        priority: 'MEDIUM',
-        description: '',
-      });
-      setCurrentPage(1);
-      await fetchComplaints();
-    } catch (err) {
-      setCreateError(
-        err?.response?.data?.message || 'Failed to create complaint'
-      );
-    } finally {
-      setIsCreating(false);
-    }
-  };
-
-  const handleOpenCreateModal = async () => {
-    setCreateError('');
-    setCreateModalOpen(true);
-    try {
-      const data = await getResidents(1, 100);
-      setResidents(data.data?.residents || []);
-    } catch {
-      setResidents([]);
-    }
-  };
-
   const handleExportCSV = () => {
     const csvContent =
-      'data:text/csv;charset=utf-8,Complaint ID,Title,Resident,Flat,Category,Priority,Status,Assigned Vendor,Created\n' +
+      'data:text/csv;charset=utf-8,Complaint ID,Title,Resident,Flat,Category,Priority,Status,Assigned To,Created\n' +
       filteredComplaints
         .map(
           (c) =>
             `"${c.id}","${c.title}","${c.residentName}","${c.flatNumber}","${c.category}","${c.priority}","${c.status}","${
-              c.assignedVendor?.companyName || 'Unassigned'
+              c.assignedVendor?.companyName || c.assignedStaff?.name || 'Unassigned'
             }","${c.createdAt}"`
         )
         .join('\n');
@@ -275,14 +231,6 @@ export default function ComplaintManagement() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create Complaint</span>
-          </button>
-
           <button
             onClick={handleExportCSV}
             className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
@@ -354,166 +302,26 @@ export default function ComplaintManagement() {
         isLoadingAssignments={isLoadingAssignments}
         assignmentError={assignmentError}
         onAssignVendorClick={handleOpenAssignVendor}
-        onAssign={handleAssignVendor}
+        onAssign={handleAssign}
         onStatusUpdated={fetchComplaints}
+        staffList={staff}
+        vendorList={vendors}
+        isLoadingStaff={isLoadingStaff}
+        isLoadingVendors={isLoadingVendors}
       />
 
       <AssignComplaintModal
         isOpen={assignVendorModalOpen}
         onClose={() => setAssignVendorModalOpen(false)}
         complaint={selectedComplaint}
+        staffList={staff}
         vendorList={vendors}
+        isLoadingStaff={isLoadingStaff}
         isLoadingVendors={isLoadingVendors}
-        onAssign={handleAssignVendor}
+        onAssign={handleAssign}
         isSubmitting={isAssigning}
         error={assignError}
       />
-
-      {/* Create Complaint Modal */}
-      {createModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5" />
-                </div>
-                <h2 className="text-lg font-bold text-slate-800">Log New Complaint</h2>
-              </div>
-              <button
-                onClick={() => setCreateModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateComplaint}>
-              <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-                {createError && (
-                  <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs text-red-700">
-                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>{createError}</span>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Complaint Title *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Main Pipeline Leakage"
-                    value={newComplaintForm.title}
-                    onChange={(e) =>
-                      setNewComplaintForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Resident *
-                  </label>
-                  <select
-                    required
-                    value={newComplaintForm.residentId}
-                    onChange={(e) =>
-                      setNewComplaintForm((prev) => ({ ...prev, residentId: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-                  >
-                    <option value="">Select a resident…</option>
-                    {residents.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                        {r.flatNumber ? ` — Flat ${r.flatNumber}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Category *
-                    </label>
-                    <select
-                      value={newComplaintForm.category}
-                      onChange={(e) =>
-                        setNewComplaintForm((prev) => ({ ...prev, category: e.target.value }))
-                      }
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-                    >
-                      <option value="Plumbing">Plumbing</option>
-                      <option value="Electrical">Electrical</option>
-                      <option value="Housekeeping">Housekeeping</option>
-                      <option value="Elevator">Elevator</option>
-                      <option value="Security">Security</option>
-                      <option value="Carpentry">Carpentry</option>
-                      <option value="General">General</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                      Priority *
-                    </label>
-                    <select
-                      value={newComplaintForm.priority}
-                      onChange={(e) =>
-                        setNewComplaintForm((prev) => ({ ...prev, priority: e.target.value }))
-                      }
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-                    >
-                      {PRIORITY_OPTIONS.map((p) => (
-                        <option key={p} value={p}>
-                          {p.charAt(0) + p.slice(1).toLowerCase()}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                    Description
-                  </label>
-                  <textarea
-                    rows={3}
-                    placeholder="Describe the complaint details..."
-                    value={newComplaintForm.description}
-                    onChange={(e) =>
-                      setNewComplaintForm((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50">
-                <button
-                  type="button"
-                  onClick={() => setCreateModalOpen(false)}
-                  className="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-                >
-                  {isCreating && <Loader2 className="w-4 h-4 animate-spin" />}
-                  {isCreating ? 'Creating…' : 'Create Complaint'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

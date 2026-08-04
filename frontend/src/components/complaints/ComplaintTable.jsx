@@ -100,8 +100,17 @@ export default function ComplaintTable({
     }
   };
 
-  const getAssignedBadge = (assignedVendor) => {
-    if (!assignedVendor || !assignedVendor.companyName) {
+  const getAssignedBadge = (complaint) => {
+    const staff = complaint?.assignedStaff;
+    const vendor = complaint?.assignedVendor;
+    if (staff?.name) {
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+          {staff.name}
+        </span>
+      );
+    }
+    if (!vendor || !vendor.companyName) {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-slate-400 bg-slate-100 border border-slate-200 italic">
           Unassigned
@@ -110,12 +119,12 @@ export default function ComplaintTable({
     }
     return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
-        {assignedVendor.companyName}
+        {vendor.companyName}
       </span>
     );
   };
 
-  const canAssign = (c) => c.status === 'OPEN' || c.status === 'IN_PROGRESS' || c.status === 'REOPENED';
+  const canAssign = (c) => c.status === 'OPEN' || c.status === 'REOPENED';
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
@@ -130,7 +139,7 @@ export default function ComplaintTable({
               <th className="py-3.5 px-4 lg:px-6">Flat</th>
               <th className="py-3.5 px-4 lg:px-6">Priority</th>
               <th className="py-3.5 px-4 lg:px-6">Status</th>
-              <th className="py-3.5 px-4 lg:px-6">Assigned Vendor</th>
+              <th className="py-3.5 px-4 lg:px-6">Assigned To</th>
               <th className="py-3.5 px-4 lg:px-6">Created</th>
               <th className="py-3.5 px-4 lg:px-6 text-right">Actions</th>
             </tr>
@@ -187,7 +196,7 @@ export default function ComplaintTable({
                   <td className="py-3.5 px-4 lg:px-6">{getPriorityBadge(c.priority)}</td>
                   <td className="py-3.5 px-4 lg:px-6">{getStatusBadge(c.status)}</td>
                   <td className="py-3.5 px-4 lg:px-6">
-                    {getAssignedBadge(c.assignedVendor)}
+                    {getAssignedBadge(c)}
                   </td>
                   <td className="py-3.5 px-4 lg:px-6 text-slate-500 text-xs">
                     {formatDate(c.createdAt)}
