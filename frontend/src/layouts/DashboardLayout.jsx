@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar.jsx';
 import Header from '../components/layout/Header.jsx';
+import PushNotificationSetup from '../components/PushNotificationSetup.jsx';
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,6 +25,9 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Web Push subscription setup (banner + service worker registration) */}
+      <PushNotificationSetup />
     </div>
   );
 }

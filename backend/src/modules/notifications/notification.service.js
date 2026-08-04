@@ -1,9 +1,30 @@
 import prisma from "../../config/prisma.js";
+import { sendPushNotificationToUser } from "./push.service.js";
 
-export const createNotification = async ({ userId, type, title, message }) => {
-  return prisma.notification.create({
-    data: { userId, type, title, message },
+export const createNotification = async ({
+  userId,
+  type,
+  title,
+  message,
+  complaintId,
+}) => {
+  const notification = await prisma.notification.create({
+    data: { userId, type, title, message, complaintId },
   });
+
+  // Best-effort web push delivery. Fire-and-forget so a push failure can never
+  // fail the notification record or the business operation that triggered it.
+  try {
+    sendPushNotificationToUser(userId, { title, message, complaintId }).catch(
+      (error) => {
+        console.error("Web push delivery failed:", error?.message || error);
+      }
+    );
+  } catch (error) {
+    console.error("Web push delivery failed:", error?.message || error);
+  }
+
+  return notification;
 };
 
 export const listUserNotifications = async (

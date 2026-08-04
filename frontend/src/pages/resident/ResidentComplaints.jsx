@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Filter, Eye, AlertCircle, Clock, Wrench, CheckCircle2, Loader2, RotateCcw } from 'lucide-react';
 import Button from '../../components/Button.jsx';
 import ComplaintDetailsDrawer from '../../components/complaints/ComplaintDetailsDrawer.jsx';
@@ -77,6 +77,8 @@ function formatDate(dateStr) {
 
 export default function ResidentComplaints() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const deepLinkComplaintId = searchParams.get('complaint');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [complaints, setComplaints] = useState([]);
@@ -111,6 +113,28 @@ export default function ResidentComplaints() {
   useEffect(() => {
     fetchComplaints();
   }, [fetchComplaints]);
+
+  // Deep link from a notification: open the exact complaint in the drawer.
+  useEffect(() => {
+    if (!deepLinkComplaintId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await getComplaintById(deepLinkComplaintId);
+        if (!cancelled && res?.data) {
+          setSelectedComplaint(res.data);
+          setIsDrawerOpen(true);
+        }
+      } catch {
+        // Not accessible to this user — do not open the drawer.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkComplaintId]);
 
   const handleOpenDetails = async (c) => {
     setSelectedComplaint(c);

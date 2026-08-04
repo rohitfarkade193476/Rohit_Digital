@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardList,
   CheckCircle2,
@@ -14,7 +15,7 @@ import {
 import StatusTimeline from '../../components/complaints/StatusTimeline.jsx';
 import ComplaintDetailsDrawer from '../../components/complaints/ComplaintDetailsDrawer.jsx';
 import ResolveComplaintModal from '../../components/complaints/ResolveComplaintModal.jsx';
-import { getComplaints, changeComplaintStatus } from '../../lib/complaintApi.js';
+import { getComplaints, getComplaintById, changeComplaintStatus } from '../../lib/complaintApi.js';
 
 const INITIAL_ASSIGNED_COMPLAINTS = [
   {
@@ -75,6 +76,8 @@ const INITIAL_ASSIGNED_COMPLAINTS = [
 ];
 
 export default function StaffAssignedComplaints() {
+  const [searchParams] = useSearchParams();
+  const deepLinkComplaintId = searchParams.get('complaint');
   const [complaints, setComplaints] = useState(INITIAL_ASSIGNED_COMPLAINTS);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -99,6 +102,33 @@ export default function StaffAssignedComplaints() {
     }
     loadLiveComplaints();
   }, []);
+
+  // Deep link from a notification: open the exact assigned complaint/work in
+  // the drawer. Uses the backend (assigned-complaint scoped) when available.
+  useEffect(() => {
+    if (!deepLinkComplaintId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await getComplaintById(deepLinkComplaintId);
+        if (!cancelled && res?.data) {
+          const c = res.data;
+          setComplaints((prev) =>
+            prev.some((x) => x.id === c.id) ? prev : [c, ...prev]
+          );
+          setSelectedComplaint(c);
+          setDrawerOpen(true);
+        }
+      } catch {
+        // Not accessible to this user — do not open the drawer.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkComplaintId]);
 
   const filtered = complaints.filter((c) => {
     const titleStr = c.title || '';
