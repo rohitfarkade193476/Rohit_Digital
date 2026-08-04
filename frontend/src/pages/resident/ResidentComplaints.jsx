@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, AlertCircle, Clock, Wrench, CheckCircle2, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, AlertCircle, Clock, Wrench, CheckCircle2, Loader2, RotateCcw } from 'lucide-react';
 import Button from '../../components/Button.jsx';
-import { getComplaints } from '../../lib/complaintApi.js';
+import ComplaintDetailsDrawer from '../../components/complaints/ComplaintDetailsDrawer.jsx';
+import { getComplaints, getComplaintById } from '../../lib/complaintApi.js';
 
 const STATUS_CONFIG = {
   OPEN: {
@@ -10,9 +11,19 @@ const STATUS_CONFIG = {
     className: 'bg-amber-50 text-amber-700 border border-amber-200',
     icon: AlertCircle,
   },
+  ASSIGNED: {
+    label: 'Assigned',
+    className: 'bg-purple-50 text-purple-700 border border-purple-200',
+    icon: Clock,
+  },
+  ACCEPTED: {
+    label: 'Accepted',
+    className: 'bg-blue-50 text-blue-700 border border-blue-200',
+    icon: CheckCircle2,
+  },
   IN_PROGRESS: {
     label: 'In Progress',
-    className: 'bg-blue-50 text-blue-700 border border-blue-200',
+    className: 'bg-indigo-50 text-indigo-700 border border-indigo-200',
     icon: Wrench,
   },
   RESOLVED: {
@@ -25,9 +36,15 @@ const STATUS_CONFIG = {
     className: 'bg-slate-100 text-slate-600 border border-slate-200',
     icon: CheckCircle2,
   },
+  REOPENED: {
+    label: 'Reopened',
+    className: 'bg-orange-50 text-orange-700 border border-orange-200',
+    icon: RotateCcw,
+  },
 };
 
 const PRIORITY_CONFIG = {
+  EMERGENCY: { label: 'Emergency', className: 'text-rose-700 bg-rose-50 border border-rose-200 font-bold' },
   HIGH: { label: 'High', className: 'text-red-600 bg-red-50 border border-red-200' },
   MEDIUM: { label: 'Medium', className: 'text-amber-600 bg-amber-50 border border-amber-200' },
   LOW: { label: 'Low', className: 'text-emerald-600 bg-emerald-50 border border-emerald-200' },
@@ -67,6 +84,10 @@ export default function ResidentComplaints() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Selected complaint for drawer
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
   const fetchComplaints = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -91,6 +112,30 @@ export default function ResidentComplaints() {
     fetchComplaints();
   }, [fetchComplaints]);
 
+  const handleOpenDetails = async (c) => {
+    setSelectedComplaint(c);
+    setIsDrawerOpen(true);
+    // Fetch full complaint with updated history if available
+    try {
+      const res = await getComplaintById(c.id);
+      if (res?.data) {
+        setSelectedComplaint(res.data);
+      }
+    } catch (err) {
+      // Use existing cached data if fetch fails
+    }
+  };
+
+  const handleStatusUpdated = async () => {
+    await fetchComplaints();
+    if (selectedComplaint) {
+      try {
+        const res = await getComplaintById(selectedComplaint.id);
+        if (res?.data) setSelectedComplaint(res.data);
+      } catch (e) {}
+    }
+  };
+
   const filtered = complaints.filter((c) => {
     const matchesSearch =
       c.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -101,7 +146,6 @@ export default function ResidentComplaints() {
 
   return (
     <div className="space-y-6">
-
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -112,7 +156,7 @@ export default function ResidentComplaints() {
         </div>
         <Button
           onClick={() => navigate('/resident/complaints/new')}
-          className="shrink-0"
+          className="shrink-0 cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-1.5" />
           Raise Complaint
@@ -144,6 +188,7 @@ export default function ResidentComplaints() {
             <option value="IN_PROGRESS">In Progress</option>
             <option value="RESOLVED">Resolved</option>
             <option value="CLOSED">Closed</option>
+            <option value="REOPENED">Reopened</option>
           </select>
         </div>
       </div>
@@ -192,9 +237,9 @@ export default function ResidentComplaints() {
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
-            {/* Table for md+ */}
+            {/* Table layout for md+ */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm text-left">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
                     <th className="px-5 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -212,13 +257,17 @@ export default function ResidentComplaints() {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                       Date
                     </th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filtered.map((complaint) => (
                     <tr
                       key={complaint.id}
-                      className="hover:bg-slate-50/70 transition-colors"
+                      onClick={() => handleOpenDetails(complaint)}
+                      className="hover:bg-slate-50/70 transition-colors cursor-pointer"
                     >
                       <td className="px-5 py-4">
                         <p className="font-mono text-xs text-indigo-600 font-semibold mb-0.5">
@@ -236,6 +285,18 @@ export default function ResidentComplaints() {
                       <td className="px-4 py-4 text-slate-500 whitespace-nowrap">
                         {formatDate(complaint.createdAt)}
                       </td>
+                      <td className="px-4 py-4 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetails(complaint);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Track Status
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -245,7 +306,11 @@ export default function ResidentComplaints() {
             {/* Card layout for mobile */}
             <div className="md:hidden divide-y divide-slate-100">
               {filtered.map((complaint) => (
-                <div key={complaint.id} className="p-4 space-y-2">
+                <div
+                  key={complaint.id}
+                  onClick={() => handleOpenDetails(complaint)}
+                  className="p-4 space-y-2 cursor-pointer hover:bg-slate-50/50"
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="font-mono text-xs text-indigo-600 font-semibold">{complaint.id.slice(0, 8)}…</p>
@@ -253,10 +318,15 @@ export default function ResidentComplaints() {
                     </div>
                     <StatusBadge status={complaint.status} />
                   </div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs text-slate-500">{complaint.category}</span>
-                    <PriorityBadge priority={complaint.priority} />
-                    <span className="text-xs text-slate-400">{formatDate(complaint.createdAt)}</span>
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-slate-500">{complaint.category}</span>
+                      <PriorityBadge priority={complaint.priority} />
+                      <span className="text-xs text-slate-400">{formatDate(complaint.createdAt)}</span>
+                    </div>
+                    <span className="text-xs font-semibold text-indigo-600 flex items-center gap-1">
+                      <Eye className="w-3 h-3" /> Details
+                    </span>
                   </div>
                 </div>
               ))}
@@ -271,6 +341,14 @@ export default function ResidentComplaints() {
           Showing {filtered.length} of {total} complaints
         </p>
       )}
+
+      {/* Complaint Detail & Status Timeline Drawer */}
+      <ComplaintDetailsDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        complaint={selectedComplaint}
+        onStatusUpdated={handleStatusUpdated}
+      />
     </div>
   );
 }

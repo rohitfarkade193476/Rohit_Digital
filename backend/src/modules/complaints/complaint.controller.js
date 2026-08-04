@@ -2,6 +2,9 @@ import {
   createComplaint,
   listComplaints,
   getComplaintById,
+  getComplaintHistory,
+  reopenComplaint,
+  changeComplaintStatus,
 } from "./complaint.service.js";
 
 import {
@@ -53,4 +56,36 @@ export const getComplaintByIdHandler = asyncHandler(async (req, res) => {
   }
 
   return successResponse(res, 200, "Complaint fetched successfully", complaint);
+});
+
+export const getComplaintHistoryHandler = asyncHandler(async (req, res) => {
+  const result = await getComplaintHistory(req.params.id, req.user);
+
+  if (result.forbidden) return errorResponse(res, 403, "Forbidden");
+  if (result.notFound) return errorResponse(res, 404, "Complaint not found");
+
+  return successResponse(res, 200, "Complaint history fetched successfully", result);
+});
+
+export const reopenComplaintHandler = asyncHandler(async (req, res) => {
+  const result = await reopenComplaint(req.params.id, req.user, {
+    note: req.body.note,
+  });
+
+  if (result.forbidden) return errorResponse(res, 403, "Forbidden");
+  if (result.notFound) return errorResponse(res, 404, "Complaint not found");
+  if (result.invalidTransition) return errorResponse(res, 422, result.message);
+
+  return successResponse(res, 200, "Complaint reopened successfully", result);
+});
+
+export const changeComplaintStatusHandler = asyncHandler(async (req, res) => {
+  const { status, note } = req.body;
+  const result = await changeComplaintStatus(req.params.id, status, req.user.id, { note });
+
+  if (result.forbidden) return errorResponse(res, 403, "Forbidden");
+  if (result.notFound) return errorResponse(res, 404, "Complaint not found");
+  if (result.invalidTransition) return errorResponse(res, 422, result.message);
+
+  return successResponse(res, 200, "Complaint status updated successfully", result);
 });

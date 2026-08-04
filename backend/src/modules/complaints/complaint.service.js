@@ -26,6 +26,28 @@ const COMPLAINT_INCLUDE = {
     },
     orderBy: { createdAt: "desc" },
   },
+  statusHistory: {
+    select: {
+      id: true,
+      status: true,
+      note: true,
+      createdAt: true,
+      changedBy: {
+        select: { id: true, name: true, role: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+};
+
+const VALID_COMPLAINT_TRANSITIONS = {
+  OPEN: ["ASSIGNED"],
+  ASSIGNED: ["ACCEPTED", "IN_PROGRESS", "OPEN"],
+  ACCEPTED: ["IN_PROGRESS", "OPEN"],
+  IN_PROGRESS: ["RESOLVED", "REOPENED", "OPEN"],
+  RESOLVED: ["CLOSED", "REOPENED"],
+  CLOSED: ["REOPENED"],
+  REOPENED: ["ASSIGNED"],
 };
 
 const mapComplaint = (complaint) => {
@@ -70,6 +92,15 @@ const mapComplaint = (complaint) => {
         companyName: a.vendor.companyName,
         category: a.vendor.category,
       },
+    })),
+    statusHistory: (complaint.statusHistory || []).map((h) => ({
+      id: h.id,
+      status: h.status,
+      note: h.note || null,
+      createdAt: h.createdAt,
+      changedBy: h.changedBy
+        ? { id: h.changedBy.id, name: h.changedBy.name, role: h.changedBy.role }
+        : null,
     })),
     createdAt: complaint.createdAt,
     updatedAt: complaint.updatedAt,
@@ -120,22 +151,39 @@ export const createComplaint = async (user, data) => {
     flatId = resident.flatId;
   }
 
-  const complaint = await prisma.complaint.create({
-    data: {
-      societyId,
-      residentId,
-      flatId,
-      title: data.title,
-      description: data.description || null,
-      category: data.category,
-      priority: data.priority || "MEDIUM",
-      status: "OPEN",
-      imageUrl: data.imageUrl || null,
-    },
+  const complaint = await prisma.$transaction(async (tx) => {
+    const c = await tx.complaint.create({
+      data: {
+        societyId,
+        residentId,
+        flatId,
+        title: data.title,
+        description: data.description || null,
+        category: data.category,
+        priority: data.priority || "MEDIUM",
+        status: "OPEN",
+        imageUrl: data.imageUrl || null,
+      },
+    });
+
+    await tx.complaintStatusHistory.create({
+      data: {
+        complaintId: c.id,
+        status: "OPEN",
+        changedById: user.id,
+        note: "Complaint created",
+      },
+    });
+
+    return c;
+  });
+
+  const full = await prisma.complaint.findUnique({
+    where: { id: complaint.id },
     include: COMPLAINT_INCLUDE,
   });
 
-  return mapComplaint(complaint);
+  return mapComplaint(full);
 };
 
 export const listComplaints = async (
@@ -205,4 +253,186 @@ export const getComplaintById = async (id, user) => {
   }
 
   return mapComplaint(complaint);
+};
+
+/**
+ * Record a complaint status change and update the complaint status atomically.
+ * Used internally by vendor-assignment.service.js and the dedicated status-change endpoints.
+ */
+export const recordStatusChange = async (
+  tx,
+  complaintId,
+  newStatus,
+  userId,
+  note
+) => {
+  const complaint = await tx.complaint.findUnique({
+    where: { id: complaintId },
+    select: { status: true },
+  });
+
+  if (!complaint) return { notFound: true };
+
+  const allowed = VALID_COMPLAINT_TRANSITIONS[complaint.status];
+  if (!allowed || !allowed.includes(newStatus)) {
+    return {
+      invalidTransition: true,
+      message: `Cannot change complaint status from ${complaint.status} to ${newStatus}`,
+    };
+  }
+
+  await tx.complaint.update({
+    where: { id: complaintId },
+    data: { status: newStatus },
+  });
+
+  await tx.complaintStatusHistory.create({
+    data: {
+      complaintId,
+      status: newStatus,
+      changedById: userId || null,
+      note: note || null,
+    },
+  });
+
+  return { ok: true };
+};
+
+/**
+ * Get the status-change history for a complaint.
+ */
+export const getComplaintHistory = async (complaintId, user) => {
+  const societyId = await getSocietyIdForUser(user.id);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findUnique({
+    where: { id: complaintId },
+    select: { id: true, societyId: true, residentId: true },
+  });
+
+  if (!complaint) return { notFound: true };
+
+  if (user.role === "RESIDENT") {
+    const resident = await prisma.resident.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!resident || complaint.residentId !== resident.id) return { notFound: true };
+  } else if (complaint.societyId !== societyId) {
+    return { notFound: true };
+  }
+
+  const history = await prisma.complaintStatusHistory.findMany({
+    where: { complaintId },
+    select: {
+      id: true,
+      status: true,
+      note: true,
+      createdAt: true,
+      changedBy: {
+        select: { id: true, name: true, role: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return {
+    history: history.map((h) => ({
+      id: h.id,
+      status: h.status,
+      note: h.note || null,
+      createdAt: h.createdAt,
+      changedBy: h.changedBy
+        ? { id: h.changedBy.id, name: h.changedBy.name, role: h.changedBy.role }
+        : null,
+    })),
+  };
+};
+
+/**
+ * Resident reopens a resolved/closed complaint.
+ */
+export const reopenComplaint = async (complaintId, user, { note } = {}) => {
+  const societyId = await getSocietyIdForUser(user.id);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findFirst({
+    where: { id: complaintId, societyId },
+    select: { id: true, residentId: true, status: true },
+  });
+
+  if (!complaint) return { notFound: true };
+
+  if (user.role === "RESIDENT") {
+    const resident = await prisma.resident.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!resident || complaint.residentId !== resident.id) return { notFound: true };
+  }
+
+  const allowed = VALID_COMPLAINT_TRANSITIONS[complaint.status];
+  if (!allowed || !allowed.includes("REOPENED")) {
+    return {
+      invalidTransition: true,
+      message: `Cannot reopen a complaint in ${complaint.status} status`,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.complaint.update({
+      where: { id: complaintId },
+      data: { status: "REOPENED" },
+    });
+
+    await tx.complaintStatusHistory.create({
+      data: {
+        complaintId,
+        status: "REOPENED",
+        changedById: user.id,
+        note: note || "Complaint reopened by resident",
+      },
+    });
+  });
+
+  const full = await prisma.complaint.findUnique({
+    where: { id: complaintId },
+    include: COMPLAINT_INCLUDE,
+  });
+
+  return mapComplaint(full);
+};
+
+/**
+ * Society Admin changes complaint status directly (e.g. RESOLVED → CLOSED).
+ */
+export const changeComplaintStatus = async (
+  complaintId,
+  newStatus,
+  adminUserId,
+  { note } = {}
+) => {
+  const societyId = await getSocietyIdForUser(adminUserId);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findFirst({
+    where: { id: complaintId, societyId },
+    select: { id: true, status: true },
+  });
+
+  if (!complaint) return { notFound: true };
+
+  const result = await prisma.$transaction(async (tx) => {
+    const r = await recordStatusChange(tx, complaintId, newStatus, adminUserId, note);
+    return r;
+  });
+
+  if (result.invalidTransition) return result;
+
+  const full = await prisma.complaint.findUnique({
+    where: { id: complaintId },
+    include: COMPLAINT_INCLUDE,
+  });
+
+  return mapComplaint(full);
 };

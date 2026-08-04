@@ -9,6 +9,9 @@ import {
   createComplaintHandler,
   getAllComplaintsHandler,
   getComplaintByIdHandler,
+  getComplaintHistoryHandler,
+  reopenComplaintHandler,
+  changeComplaintStatusHandler,
 } from "./complaint.controller.js";
 import {
   assignVendorHandler,
@@ -64,6 +67,27 @@ router.get(
   requireAuth,
   requireRole("SOCIETY_ADMIN"),
   getComplaintAssignmentsHandler,
+);
+
+router.get(
+  "/:id/history",
+  requireAuth,
+  requireRole("RESIDENT", "SOCIETY_ADMIN"),
+  getComplaintHistoryHandler,
+);
+
+router.post(
+  "/:id/reopen",
+  requireAuth,
+  requireRole("RESIDENT"),
+  reopenComplaintHandler,
+);
+
+router.patch(
+  "/:id/status",
+  requireAuth,
+  requireRole("SOCIETY_ADMIN"),
+  changeComplaintStatusHandler,
 );
 
 export default router;

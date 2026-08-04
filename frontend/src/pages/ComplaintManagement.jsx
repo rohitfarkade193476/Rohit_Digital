@@ -339,6 +339,7 @@ export default function ComplaintManagement() {
         isLoadingAssignments={isLoadingAssignments}
         assignmentError={assignmentError}
         onAssignVendorClick={handleOpenAssignVendor}
+        onStatusUpdated={fetchComplaints}
       />
 
       <AssignVendorModal

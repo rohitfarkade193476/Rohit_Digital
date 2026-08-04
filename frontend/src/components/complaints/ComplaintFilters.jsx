@@ -57,9 +57,12 @@ export default function ComplaintFilters({
           >
             <option value="ALL">All Status</option>
             <option value="OPEN">Open</option>
+            <option value="ASSIGNED">Assigned</option>
+            <option value="ACCEPTED">Accepted</option>
             <option value="IN_PROGRESS">In Progress</option>
             <option value="RESOLVED">Resolved</option>
             <option value="CLOSED">Closed</option>
+            <option value="REOPENED">Reopened</option>
           </select>
         </div>
 

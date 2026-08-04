@@ -3,8 +3,8 @@ import { AlertCircle, Clock, Wrench, CheckCircle2 } from 'lucide-react';
 
 export default function ComplaintStats({ complaints = [] }) {
   const total = complaints.length;
-  const open = complaints.filter((c) => c.status === 'OPEN').length;
-  const inProgress = complaints.filter((c) => c.status === 'IN_PROGRESS').length;
+  const open = complaints.filter((c) => c.status === 'OPEN' || c.status === 'REOPENED').length;
+  const inProgress = complaints.filter((c) => c.status === 'ASSIGNED' || c.status === 'ACCEPTED' || c.status === 'IN_PROGRESS').length;
   const resolved = complaints.filter((c) => c.status === 'RESOLVED' || c.status === 'CLOSED').length;
 
   const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0;
