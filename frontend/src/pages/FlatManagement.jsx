@@ -5,7 +5,7 @@ import FlatStats from '../components/flats/FlatStats.jsx';
 import FlatFilters from '../components/flats/FlatFilters.jsx';
 import FlatTable from '../components/flats/FlatTable.jsx';
 import FlatFormModal from '../components/flats/FlatFormModal.jsx';
-import ExcelUploadModal from '../components/flats/ExcelUploadModal.jsx';
+import ExcelImportModal from '../components/common/ExcelImportModal.jsx';
 import DeleteConfirmationModal from '../components/flats/DeleteConfirmationModal.jsx';
 
 import { getFlats, createFlat, updateFlat, deleteFlat,uploadFlatsExcel } from '../lib/flatsApi.js';
@@ -259,15 +259,18 @@ export default function FlatManagement() {
         error={formError}
       />
 
-      <ExcelUploadModal
+      <ExcelImportModal
         isOpen={excelModalOpen}
         onClose={() => setExcelModalOpen(false)}
-        onUploadSuccess={() => {
-          setExcelModalOpen(false);
-          fetchFlats();
-        }}
-        uploadFunction={uploadFlatsExcel}
         title="Upload Flats via Excel"
+        subtitle="Bulk upload flats via Excel"
+        description="Upload an Excel file containing flat details. Duplicate flat numbers are skipped automatically."
+        itemNoun="flat"
+        itemNounPlural="flats"
+        columnsHint="Flat Number, Wing, Floor, Type, Status"
+        importFunction={uploadFlatsExcel}
+        importLabel="Upload Flats"
+        onSuccess={fetchFlats}
       />
 
       <DeleteConfirmationModal

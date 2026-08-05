@@ -27,7 +27,17 @@ app.use(cors({
   // origin: true,
   credentials: true,
 }));
-app.all("/api/auth/{*any}", toNodeHandler(auth));
+const authHandler = toNodeHandler(auth);
+app.all("/api/auth/{*any}", async (req, res) => {
+  try {
+    await authHandler(req, res);
+  } catch (err) {
+    console.error("AUTH-HANDLER-ERROR:", err);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: err?.message || "Auth error" });
+    }
+  }
+});
 
 app.use(express.json());
 app.use(cookieParser());

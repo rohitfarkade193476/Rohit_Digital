@@ -1,9 +1,110 @@
 import crypto from "crypto";
 import prisma from "../../config/prisma.js";
 import { auth } from "../../lib/auth.js";
+import {
+  normalizeText,
+  isValidEmail,
+  isValidPhone,
+  parseExcelDate,
+  readExcelRows,
+  removeUploadedFile,
+} from "../../utils/excelImport.js";
 
 const generateTemporaryPassword = () =>
   crypto.randomBytes(24).toString("base64url");
+
+const findExistingUser = async ({ phone, email }) => {
+  return prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(phone ? [{ phone }] : []),
+        ...(email ? [{ email }] : []),
+      ],
+    },
+  });
+};
+
+/**
+ * Parses and validates every row of a staff Excel file.
+ *
+ * The authenticated Society Admin's society is the source of truth for
+ * ownership; it is never taken from the file itself.
+ *
+ * Returns an array of rows in the shape:
+ * { rowNumber, name, phone, email, role, department, joiningDate, valid, errors }
+ */
+const parseStaffExcelRows = async (filePath, societyId) => {
+  const rows = readExcelRows(filePath);
+
+  const result = [];
+  for (let i = 0; i < rows.length; i++) {
+    const raw = rows[i];
+    const rowNumber = i + 2;
+
+    const name = normalizeText(raw["Name"]);
+    const phone = normalizeText(raw["Phone Number"]);
+    const email = normalizeText(raw["Email"]).toLowerCase();
+    const role = normalizeText(raw["Role"]);
+    const department = normalizeText(raw["Department"]);
+    const { ok: joiningDateOk, label: joiningDate } = parseExcelDate(
+      raw["Joining Date"]
+    );
+
+    const errors = [];
+
+    if (!name || !phone || !email || !role || !department) {
+      errors.push(
+        "Missing required fields (Name, Phone Number, Email, Role, Department)"
+      );
+    }
+
+    if (name && (name.length < 2 || name.length > 100)) {
+      errors.push("Name must be 2-100 characters");
+    }
+
+    if (email && !isValidEmail(email)) {
+      errors.push("Invalid email address");
+    }
+
+    if (phone && !isValidPhone(phone)) {
+      errors.push("Invalid phone number");
+    }
+
+    if (role && role.length > 50) {
+      errors.push("Role must be at most 50 characters");
+    }
+
+    if (department && department.length > 50) {
+      errors.push("Department must be at most 50 characters");
+    }
+
+    if (!joiningDateOk) {
+      errors.push("Invalid joining date. Use YYYY-MM-DD format.");
+    }
+
+    if (errors.length === 0) {
+      const existingUser = await findExistingUser({ phone, email });
+      if (existingUser) {
+        const field = existingUser.phone === phone ? "phone" : "email";
+        errors.push(`User with ${field} ${existingUser[field]} already exists`);
+      }
+    }
+
+    result.push({
+      rowNumber,
+      name,
+      phone,
+      email,
+      role,
+      department,
+      joiningDate,
+      valid: errors.length === 0,
+      errors,
+    });
+  }
+
+  return result;
+};
 
 const STAFF_SELECT = {
   id: true,
@@ -238,7 +339,7 @@ export const updateStaff = async (id, societyId, data) => {
   return mapStaff(staff);
 };
 
-export const deactivateStaff = async (id, societyId) => {
+export const deleteStaff = async (id, societyId) => {
   const existing = await prisma.staff.findUnique({
     where: { id },
     select: { id: true, societyId: true, userId: true },
@@ -247,10 +348,157 @@ export const deactivateStaff = async (id, societyId) => {
   if (!existing) return { notFound: true };
   if (existing.societyId !== societyId) return { forbidden: true };
 
-  await prisma.user.update({
-    where: { id: existing.userId },
-    data: { isActive: false },
+  // Hard delete: the row must disappear from the database, not just be
+  // flagged inactive. Deleting the Staff row cascades to its
+  // StaffAssignments (onDelete: Cascade); deleting the User cascades to the
+  // auth Account/Session/Notification rows and is the same pattern the
+  // resident module already uses.
+  await prisma.$transaction(async (tx) => {
+    await tx.staff.delete({ where: { id: existing.id } });
+    await tx.user.delete({ where: { id: existing.userId } });
   });
 
-  return { deactivated: true };
+  return { deleted: true };
+};
+
+export const previewStaffExcel = async (filePath, societyId) => {
+  let rows;
+  try {
+    rows = await parseStaffExcelRows(filePath, societyId);
+  } catch (error) {
+    console.error("Failed to preview staff Excel:", error);
+    throw new Error(
+      "Could not read the Excel file. Please upload a valid .xlsx or .xls file."
+    );
+  } finally {
+    removeUploadedFile(filePath);
+  }
+
+  const valid = rows.filter((row) => row.valid).length;
+
+  return {
+    total: rows.length,
+    valid,
+    invalid: rows.length - valid,
+    rows,
+  };
+};
+
+export const importStaffExcel = async (filePath, societyId) => {
+  let rows;
+  try {
+    rows = await parseStaffExcelRows(filePath, societyId);
+  } catch (error) {
+    console.error("Failed to import staff Excel:", error);
+    throw new Error(
+      "Could not read the Excel file. Please upload a valid .xlsx or .xls file."
+    );
+  } finally {
+    removeUploadedFile(filePath);
+  }
+
+  let imported = 0;
+  let failed = 0;
+  let invited = 0;
+  let invitationFailed = 0;
+  const errors = [];
+
+  for (const row of rows) {
+    if (!row.valid) {
+      failed++;
+      errors.push({ row: row.rowNumber, message: row.errors.join("; ") });
+      continue;
+    }
+
+    // Re-check duplicates at import time to stay safe even if the preview
+    // ran a while ago or another admin imported in the meantime.
+    const existingUser = await findExistingUser({
+      phone: row.phone,
+      email: row.email,
+    });
+
+    if (existingUser) {
+      failed++;
+      const field = existingUser.phone === row.phone ? "phone" : "email";
+      errors.push({
+        row: row.rowNumber,
+        message: `User with ${field} ${existingUser[field]} already exists`,
+      });
+      continue;
+    }
+
+    const nameParts = row.name.split(" ");
+    const firstName = nameParts[0];
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    let authUser;
+    try {
+      authUser = await auth.api.signUpEmail({
+        body: {
+          name: row.name,
+          email: row.email,
+          password: generateTemporaryPassword(),
+          firstName,
+          lastName,
+          phone: row.phone || null,
+          role: "STAFF",
+          societyId,
+          isActive: true,
+        },
+      });
+    } catch (error) {
+      console.error(
+        `Failed to create imported staff account for ${row.email}:`,
+        error
+      );
+      failed++;
+      errors.push({ row: row.rowNumber, message: "Failed to create staff account" });
+      continue;
+    }
+
+    try {
+      await prisma.staff.create({
+        data: {
+          userId: authUser.user.id,
+          societyId,
+          role: row.role,
+          department: row.department,
+          joiningDate: row.joiningDate ? new Date(row.joiningDate) : null,
+        },
+      });
+    } catch (error) {
+      await prisma.user
+        .delete({ where: { id: authUser.user.id } })
+        .catch(() => {});
+      console.error(`Failed to create imported staff row for ${row.email}:`, error);
+      failed++;
+      errors.push({ row: row.rowNumber, message: "Failed to create staff record" });
+      continue;
+    }
+
+    imported++;
+
+    // A failed invitation email must not fail the import.
+    if (row.email) {
+      try {
+        await auth.api.requestPasswordReset({ body: { email: row.email } });
+        invited++;
+      } catch (error) {
+        invitationFailed++;
+        console.error(
+          `Failed to initiate invitation for imported staff ${row.email}:`,
+          error
+        );
+      }
+    }
+  }
+
+  return {
+    total: rows.length,
+    imported,
+    failed,
+    invited,
+    invitationFailed,
+    errors,
+  };
 };

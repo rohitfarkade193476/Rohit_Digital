@@ -1,8 +1,13 @@
 import crypto from "crypto";
 import prisma from "../../config/prisma.js";
 import { auth } from "../../lib/auth.js";
-import XLSX from "xlsx";
-import fs from "fs";
+import {
+  normalizeText,
+  isValidEmail,
+  isValidPhone,
+  readExcelRows,
+  removeUploadedFile,
+} from "../../utils/excelImport.js";
 
 const generateTemporaryPassword = () =>
   crypto.randomBytes(24).toString("base64url");
@@ -316,12 +321,129 @@ export const deleteResident = async (id, societyId) => {
   return { deleted: true };
 };
 
+/**
+ * Parses and validates every row of a resident Excel file.
+ *
+ * The authenticated Society Admin's society is the source of truth for
+ * ownership; it is never taken from the file itself.
+ *
+ * Returns an array of rows in the shape:
+ * { rowNumber, name, phone, email, flatNumber, residentType, valid, errors }
+ */
+const parseResidentExcelRows = async (filePath, societyId) => {
+  const rows = readExcelRows(filePath);
+
+  const result = [];
+  for (let i = 0; i < rows.length; i++) {
+    const raw = rows[i];
+    const rowNumber = i + 2;
+
+    const name = normalizeText(raw["Resident Name"]);
+    const phone = normalizeText(raw["Phone Number"]);
+    const email = normalizeText(raw["Email"]).toLowerCase();
+    const flatNumber = normalizeText(raw["Flat Number"]);
+    const residentType = normalizeText(raw["Resident Type"]);
+
+    const errors = [];
+
+    if (!name || !phone || !email || !flatNumber || !residentType) {
+      errors.push(
+        "Missing required fields (Resident Name, Phone Number, Email, Flat Number, Resident Type)"
+      );
+    }
+
+    if (name && (name.length < 2 || name.length > 100)) {
+      errors.push("Resident name must be 2-100 characters");
+    }
+
+    if (email && !isValidEmail(email)) {
+      errors.push("Invalid email address");
+    }
+
+    if (phone && !isValidPhone(phone)) {
+      errors.push("Invalid phone number");
+    }
+
+    if (residentType && !["Owner", "Tenant"].includes(residentType)) {
+      errors.push(
+        `Invalid Resident Type "${residentType}". Must be "Owner" or "Tenant".`
+      );
+    }
+
+    if (errors.length === 0) {
+      const flat = await prisma.flat.findFirst({
+        where: { societyId, flatNumber },
+      });
+
+      if (!flat) {
+        errors.push(`Flat "${flatNumber}" not found`);
+      }
+
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [
+            ...(phone ? [{ phone }] : []),
+            ...(email ? [{ email }] : []),
+          ],
+        },
+      });
+
+      if (existingUser) {
+        const field = existingUser.phone === phone ? "phone" : "email";
+        errors.push(`User with ${field} ${existingUser[field]} already exists`);
+      }
+    }
+
+    result.push({
+      rowNumber,
+      name,
+      phone,
+      email,
+      flatNumber,
+      residentType,
+      valid: errors.length === 0,
+      errors,
+    });
+  }
+
+  return result;
+};
+
+export const previewResidentsExcel = async (filePath, societyId) => {
+  let rows;
+  try {
+    rows = await parseResidentExcelRows(filePath, societyId);
+  } catch (error) {
+    console.error("Failed to preview residents Excel:", error);
+    throw new Error(
+      "Could not read the Excel file. Please upload a valid .xlsx or .xls file."
+    );
+  } finally {
+    removeUploadedFile(filePath);
+  }
+
+  const valid = rows.filter((row) => row.valid).length;
+
+  return {
+    total: rows.length,
+    valid,
+    invalid: rows.length - valid,
+    rows,
+  };
+};
+
 export const uploadResidentsFromExcel = async (filePath, societyId) => {
-  const workbook = XLSX.readFile(filePath);
-
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-
-  const rows = XLSX.utils.sheet_to_json(sheet);
+  let rows;
+  try {
+    rows = await parseResidentExcelRows(filePath, societyId);
+  } catch (error) {
+    console.error("Failed to import residents Excel:", error);
+    throw new Error(
+      "Could not read the Excel file. Please upload a valid .xlsx or .xls file."
+    );
+  } finally {
+    removeUploadedFile(filePath);
+  }
 
   let imported = 0;
   let failed = 0;
@@ -329,68 +451,45 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
   let invitationFailed = 0;
   const errors = [];
 
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-    const rowNumber = i + 2;
-
-    const residentName = String(row["Resident Name"] || "").trim();
-    const phone = String(row["Phone Number"] || "").trim();
-    const email = String(row["Email"] || "").trim();
-    const flatNumber = String(row["Flat Number"] || "").trim();
-    const residentType = String(row["Resident Type"] || "").trim();
-
-    if (!residentName || !phone || !email || !flatNumber || !residentType) {
+  for (const row of rows) {
+    if (!row.valid) {
       failed++;
-      errors.push({
-        row: rowNumber,
-        message:
-          "Missing required fields (Resident Name, Phone Number, Email, Flat Number, Resident Type)",
-      });
+      errors.push({ row: row.rowNumber, message: row.errors.join("; ") });
       continue;
     }
 
-    if (!["Owner", "Tenant"].includes(residentType)) {
-      failed++;
-      errors.push({
-        row: rowNumber,
-        message: `Invalid Resident Type "${residentType}". Must be "Owner" or "Tenant".`,
-      });
-      continue;
-    }
-
-    const flat = await prisma.flat.findFirst({
-      where: { societyId, flatNumber },
-    });
-
-    if (!flat) {
-      failed++;
-      errors.push({
-        row: rowNumber,
-        message: `Flat "${flatNumber}" not found`,
-      });
-      continue;
-    }
-
+    // Re-check duplicates at import time to stay safe even if the preview
+    // ran a while ago or another admin imported in the meantime.
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          ...(phone ? [{ phone }] : []),
-          ...(email ? [{ email }] : []),
+          ...(row.phone ? [{ phone: row.phone }] : []),
+          ...(row.email ? [{ email: row.email }] : []),
         ],
       },
     });
 
     if (existingUser) {
       failed++;
-      const field = existingUser.phone === phone ? "phone" : "email";
+      const field = existingUser.phone === row.phone ? "phone" : "email";
       errors.push({
-        row: rowNumber,
+        row: row.rowNumber,
         message: `User with ${field} ${existingUser[field]} already exists`,
       });
       continue;
     }
 
-    const nameParts = residentName.split(" ");
+    const flat = await prisma.flat.findFirst({
+      where: { societyId, flatNumber: row.flatNumber },
+    });
+
+    if (!flat) {
+      failed++;
+      errors.push({ row: row.rowNumber, message: `Flat "${row.flatNumber}" not found` });
+      continue;
+    }
+
+    const nameParts = row.name.split(" ");
     const firstName = nameParts[0];
     const lastName = nameParts.slice(1).join(" ") || "";
 
@@ -400,12 +499,12 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
     try {
       authUser = await auth.api.signUpEmail({
         body: {
-          name: residentName,
-          email,
+          name: row.name,
+          email: row.email,
           password: generateTemporaryPassword(),
           firstName,
           lastName,
-          phone: phone || null,
+          phone: row.phone || null,
           role: "RESIDENT",
           societyId,
           isActive: true,
@@ -414,7 +513,7 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
     } catch (error) {
       failed++;
       errors.push({
-        row: rowNumber,
+        row: row.rowNumber,
         message: "Failed to create resident account",
       });
       continue;
@@ -427,7 +526,7 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
             userId: authUser.user.id,
             societyId,
             flatId: flat.id,
-            residentType,
+            residentType: row.residentType,
           },
         });
 
@@ -443,7 +542,7 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
         .catch(() => {});
       failed++;
       errors.push({
-        row: rowNumber,
+        row: row.rowNumber,
         message: "Failed to create resident",
       });
       continue;
@@ -453,21 +552,26 @@ export const uploadResidentsFromExcel = async (filePath, societyId) => {
 
     // Send the invitation email only after this row fully succeeded.
     // A failed email must not fail the import.
-    if (email) {
+    if (row.email) {
       try {
-        await auth.api.requestPasswordReset({ body: { email } });
+        await auth.api.requestPasswordReset({ body: { email: row.email } });
         invited++;
       } catch (error) {
         invitationFailed++;
         console.error(
-          `Failed to initiate invitation for imported resident ${email}:`,
+          `Failed to initiate invitation for imported resident ${row.email}:`,
           error
         );
       }
     }
   }
 
-  fs.unlinkSync(filePath);
-
-  return { imported, failed, invited, invitationFailed, errors };
+  return {
+    total: rows.length,
+    imported,
+    failed,
+    invited,
+    invitationFailed,
+    errors,
+  };
 };

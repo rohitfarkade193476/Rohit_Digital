@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth.js";
 import { requireRole } from "../../middlewares/requireRole.js";
 import { validate } from "../../middlewares/validate.js";
+import { uploadExcel } from "../../middlewares/upload.middleware.js";
 import { createStaffValidation } from "./validators/createStaff.validator.js";
 import { updateStaffValidation } from "./validators/updateStaff.validator.js";
 import {
@@ -9,7 +10,9 @@ import {
   getStaffByIdHandler,
   createStaffHandler,
   updateStaffHandler,
-  deactivateStaffHandler,
+  deleteStaffHandler,
+  previewStaffExcelHandler,
+  importStaffExcelHandler,
 } from "./staff.controller.js";
 
 const router = Router();
@@ -28,6 +31,22 @@ router.post(
   createStaffValidation,
   validate,
   createStaffHandler,
+);
+
+router.post(
+  "/upload/preview",
+  requireAuth,
+  requireRole("SOCIETY_ADMIN"),
+  uploadExcel.single("file"),
+  previewStaffExcelHandler,
+);
+
+router.post(
+  "/upload",
+  requireAuth,
+  requireRole("SOCIETY_ADMIN"),
+  uploadExcel.single("file"),
+  importStaffExcelHandler,
 );
 
 router.get(
@@ -50,7 +69,7 @@ router.delete(
   "/:id",
   requireAuth,
   requireRole("SOCIETY_ADMIN"),
-  deactivateStaffHandler,
+  deleteStaffHandler,
 );
 
 export default router;

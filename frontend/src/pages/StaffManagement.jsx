@@ -1,107 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Mail, Download } from 'lucide-react';
+import { Plus, Mail, Download, Upload } from 'lucide-react';
 
 import StaffStats from '../components/staff/StaffStats.jsx';
 import StaffFilters from '../components/staff/StaffFilters.jsx';
 import StaffTable from '../components/staff/StaffTable.jsx';
 import StaffFormModal from '../components/staff/StaffFormModal.jsx';
+import ExcelImportModal from '../components/common/ExcelImportModal.jsx';
 import DeleteConfirmationModal from '../components/staff/DeleteConfirmationModal.jsx';
-
-// Initial Sample Data (8 realistic staff members)
-const INITIAL_STAFF = [
-  {
-    id: 'staff-1',
-    name: 'Ramesh Kumar',
-    role: 'Security',
-    department: 'Security',
-    phone: '+91 98123 45678',
-    email: 'ramesh.k@society.com',
-    status: 'ACTIVE',
-    invitationStatus: 'Accepted',
-    joiningDate: '2021-04-10',
-  },
-  {
-    id: 'staff-2',
-    name: 'Sunita Sharma',
-    role: 'Manager',
-    department: 'Management',
-    phone: '+91 98234 56789',
-    email: 'sunita.s@society.com',
-    status: 'ACTIVE',
-    invitationStatus: 'Accepted',
-    joiningDate: '2020-01-15',
-  },
-  {
-    id: 'staff-3',
-    name: 'Mohan Lal',
-    role: 'Electrician',
-    department: 'Maintenance',
-    phone: '+91 98345 67890',
-    email: 'mohan.electrician@society.com',
-    status: 'ACTIVE',
-    invitationStatus: 'Accepted',
-    joiningDate: '2022-03-01',
-  },
-  {
-    id: 'staff-4',
-    name: 'Vijay Singh',
-    role: 'Plumber',
-    department: 'Maintenance',
-    phone: '+91 98456 78901',
-    email: 'vijay.plumber@society.com',
-    status: 'INVITED',
-    invitationStatus: 'Pending',
-    joiningDate: '2023-08-01',
-  },
-  {
-    id: 'staff-5',
-    name: 'Geeta Devi',
-    role: 'Cleaner',
-    department: 'Housekeeping',
-    phone: '+91 98567 89012',
-    email: 'geeta.cleaner@society.com',
-    status: 'ACTIVE',
-    invitationStatus: 'Accepted',
-    joiningDate: '2021-09-20',
-  },
-  {
-    id: 'staff-6',
-    name: 'Anil Deshmukh',
-    role: 'Security',
-    department: 'Security',
-    phone: '+91 98678 90123',
-    email: 'anil.security@society.com',
-    status: 'INACTIVE',
-    invitationStatus: 'Expired',
-    joiningDate: '2019-11-12',
-  },
-  {
-    id: 'staff-7',
-    name: 'Suresh Patel',
-    role: 'Electrician',
-    department: 'Maintenance',
-    phone: '+91 98789 01234',
-    email: 'suresh.electrician@society.com',
-    status: 'INVITED',
-    invitationStatus: 'Pending',
-    joiningDate: '2023-11-05',
-  },
-  {
-    id: 'staff-8',
-    name: 'Kavita Rani',
-    role: 'Cleaner',
-    department: 'Housekeeping',
-    phone: '+91 98890 12345',
-    email: 'kavita.cleaner@society.com',
-    status: 'ACTIVE',
-    invitationStatus: 'Accepted',
-    joiningDate: '2022-06-18',
-  },
-];
+import {
+  getAllStaff,
+  createStaff,
+  updateStaff,
+  deleteStaff,
+  previewStaffExcel,
+  importStaffExcel,
+} from '../lib/staffApi.js';
 
 export default function StaffManagement() {
   // ── Main State ──────────────────────────────────────────────────────────
-  const [staffList, setStaffList] = useState(INITIAL_STAFF);
+  const [staffList, setStaffList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -115,9 +34,32 @@ export default function StaffManagement() {
   const [formMode, setFormMode] = useState('add'); // 'add' | 'edit' | 'view'
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  const [excelModalOpen, setExcelModalOpen] = useState(false);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // ── Fetch staff from backend ────────────────────────────────────────────
+  const fetchStaff = async () => {
+    try {
+      setIsLoading(true);
+      setFetchError('');
+
+      const data = await getAllStaff({ page: 1, limit: 100 });
+
+      setStaffList(data.data.staff || []);
+    } catch (err) {
+      setFetchError(err.response?.data?.message || 'Failed to load staff');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStaff();
+  }, []);
 
   // ── Auto-dismiss toast notification after 3 seconds ────────────────────
   useEffect(() => {
@@ -139,7 +81,7 @@ export default function StaffManagement() {
       const matchesRole = selectedRole === 'ALL' || s.role === selectedRole;
       const matchesStatus =
         selectedStatus === 'ALL' ||
-        s.status.toLowerCase() === selectedStatus.toLowerCase();
+        (s.status || '').toLowerCase() === selectedStatus.toLowerCase();
       const matchesDept =
         selectedDepartment === 'ALL' ||
         (s.department || '').toLowerCase() === selectedDepartment.toLowerCase();
@@ -161,18 +103,21 @@ export default function StaffManagement() {
   const handleOpenAddModal = () => {
     setFormMode('add');
     setSelectedStaff(null);
+    setFormError('');
     setFormModalOpen(true);
   };
 
   const handleOpenViewModal = (staff) => {
     setFormMode('view');
     setSelectedStaff(staff);
+    setFormError('');
     setFormModalOpen(true);
   };
 
   const handleOpenEditModal = (staff) => {
     setFormMode('edit');
     setSelectedStaff(staff);
+    setFormError('');
     setFormModalOpen(true);
   };
 
@@ -182,39 +127,46 @@ export default function StaffManagement() {
   };
 
   // ── CRUD Operations ─────────────────────────────────────────────────────
-  const handleFormSubmit = (formData) => {
-    setIsSubmitting(true);
-    setTimeout(() => {
+  const handleFormSubmit = async (formData) => {
+    try {
+      setIsSubmitting(true);
+      setFormError('');
+
       if (formMode === 'add') {
-        const newStaff = {
-          ...formData,
-          id: `staff-${Date.now()}`,
-          invitationStatus: formData.status === 'INVITED' ? 'Pending' : 'Accepted',
-        };
-        setStaffList((prev) => [newStaff, ...prev]);
+        await createStaff(formData);
         setSuccessMessage(`Staff member "${formData.name}" added successfully.`);
       } else if (formMode === 'edit' && selectedStaff) {
-        setStaffList((prev) =>
-          prev.map((s) => (s.id === selectedStaff.id ? { ...s, ...formData } : s))
-        );
+        await updateStaff(selectedStaff.id, formData);
         setSuccessMessage(`Staff member "${formData.name}" updated successfully.`);
       }
-      setIsSubmitting(false);
+
+      await fetchStaff();
       setFormModalOpen(false);
       setSelectedStaff(null);
-    }, 400);
+    } catch (err) {
+      setFormError(err.response?.data?.message || 'Operation failed');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!selectedStaff) return;
-    setIsDeleting(true);
-    setTimeout(() => {
-      setStaffList((prev) => prev.filter((s) => s.id !== selectedStaff.id));
+    try {
+      setIsDeleting(true);
+
+      await deleteStaff(selectedStaff.id);
+
+      await fetchStaff();
+
       setSuccessMessage(`Staff member "${selectedStaff.name}" deleted successfully.`);
-      setIsDeleting(false);
       setDeleteModalOpen(false);
       setSelectedStaff(null);
-    }, 400);
+    } catch (err) {
+      setFetchError(err.response?.data?.message || 'Delete failed');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSendInvitation = () => {
@@ -242,6 +194,12 @@ export default function StaffManagement() {
     setSuccessMessage('Staff list exported successfully as CSV.');
   };
 
+  const handleExcelImportSuccess = (result) => {
+    setSuccessMessage(
+      `${result.imported} staff ${result.imported === 1 ? 'member was' : 'members were'} imported successfully.`
+    );
+    fetchStaff();
+  };
   return (
     <div className="space-y-6">
       {/* Top Header Section */}
@@ -264,6 +222,15 @@ export default function StaffManagement() {
           >
             <Plus className="w-4 h-4" />
             <span>Add Staff</span>
+          </button>
+
+          {/* Import Excel */}
+          <button
+            onClick={() => setExcelModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-sm font-semibold rounded-lg shadow-sm transition-colors cursor-pointer"
+          >
+            <Upload className="w-4 h-4 text-slate-500" />
+            <span>Import Excel</span>
           </button>
 
           {/* Send Invitation */}
@@ -292,6 +259,14 @@ export default function StaffManagement() {
         <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium animate-in fade-in duration-200">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
           {successMessage}
+        </div>
+      )}
+
+      {/* Error Banner */}
+      {fetchError && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-sm font-medium animate-in fade-in duration-200">
+          <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
+          {fetchError}
         </div>
       )}
 
@@ -326,6 +301,7 @@ export default function StaffManagement() {
       {/* Staff Data Table */}
       <StaffTable
         staffList={filteredStaff}
+        isLoading={isLoading}
         searchTerm={searchTerm}
         currentPage={currentPage}
         onPageChange={setCurrentPage}
@@ -342,6 +318,25 @@ export default function StaffManagement() {
         initialData={selectedStaff}
         onSubmit={handleFormSubmit}
         isSubmitting={isSubmitting}
+        error={formError}
+      />
+
+      <ExcelImportModal
+        isOpen={excelModalOpen}
+        onClose={() => setExcelModalOpen(false)}
+        title="Import Staff"
+        subtitle="Bulk import staff via Excel"
+        description="Upload an Excel file containing staff details. The staff will belong to your society and receive an activation email to set their password."
+        itemNoun="staff member"
+        itemNounPlural="staff members"
+        columnsHint="Name, Phone Number, Email, Role, Department, Joining Date"
+        templateCsv="data:text/csv;charset=utf-8,Name,Phone Number,Email,Role,Department,Joining Date\nRahul Sharma,+91 98765 43210,rahul.sharma@example.com,Security,Security,2024-01-15\n"
+        templateFilename="staff_import_template.csv"
+        previewFunction={previewStaffExcel}
+        importFunction={importStaffExcel}
+        previewExtraColumn={{ label: 'Department', accessor: 'department' }}
+        importLabel="Import Staff"
+        onSuccess={handleExcelImportSuccess}
       />
 
       <DeleteConfirmationModal
