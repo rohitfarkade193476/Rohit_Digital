@@ -7,6 +7,7 @@ import {
   createResidentHandler,
   updateResidentHandler,
   deleteResidentHandler,
+  previewResidentsExcelHandler,
   uploadResidentsFromExcelHandler,
 } from "./resident.controller.js";
 
@@ -25,6 +26,14 @@ router.post(
   requireAuth,
   requireRole("SOCIETY_ADMIN"),
   createResidentHandler,
+);
+
+router.post(
+  "/upload/preview",
+  requireAuth,
+  requireRole("SOCIETY_ADMIN"),
+  uploadExcel.single("file"),
+  previewResidentsExcelHandler
 );
 
 router.post(

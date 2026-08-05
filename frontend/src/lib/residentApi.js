@@ -1,5 +1,27 @@
 import axiosInstance from "./axiosInstance";
 
+/**
+ * Validate a residents Excel file without creating any records.
+ * @param {File} file - .xlsx / .xls file
+ * @returns {Promise<{ success, message, data: { total, valid, invalid, rows } }>}
+ */
+export const previewResidentsExcel = async (file) => {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await axiosInstance.post(
+    "/api/residents/upload/preview",
+    formData,
+    {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }
+  );
+
+  return response.data;
+};
+
 export const uploadResidentsExcel = async (file) => {
   const formData = new FormData();
   formData.append("file", file);

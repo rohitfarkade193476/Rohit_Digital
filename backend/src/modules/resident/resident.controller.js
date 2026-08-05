@@ -5,6 +5,7 @@ import {
   updateResident,
   deleteResident,
   uploadResidentsFromExcel,
+  previewResidentsExcel,
 } from "./resident.service.js";
 
 import {
@@ -74,6 +75,22 @@ export const deleteResidentHandler = asyncHandler(async (req, res) => {
   }
 
   return successResponse(res, 200, "Resident deleted successfully");
+});
+
+export const previewResidentsExcelHandler = asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return errorResponse(res, 400, "Please upload an Excel file");
+  }
+
+  try {
+    const result = await previewResidentsExcel(
+      req.file.path,
+      req.user.societyId
+    );
+    return successResponse(res, 200, "Residents Excel preview generated", result);
+  } catch (error) {
+    return errorResponse(res, 400, error.message || "Could not read the Excel file");
+  }
 });
 
 export const uploadResidentsFromExcelHandler = asyncHandler(async (req, res) => {

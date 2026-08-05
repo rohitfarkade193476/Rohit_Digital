@@ -5,9 +5,9 @@ import ResidentStats from '../components/residents/ResidentStats.jsx';
 import ResidentFilters from '../components/residents/ResidentFilters.jsx';
 import ResidentTable from '../components/residents/ResidentTable.jsx';
 import ResidentFormModal from '../components/residents/ResidentFormModal.jsx';
-import ExcelUploadResidentModal from '../components/residents/ExcelUploadResidentModal.jsx';
+import ExcelImportModal from '../components/common/ExcelImportModal.jsx';
 import DeleteConfirmationModal from '../components/residents/DeleteConfirmationModal.jsx';
-import { uploadResidentsExcel } from "../lib/residentApi";
+import { previewResidentsExcel, uploadResidentsExcel } from "../lib/residentApi";
 
 export default function Residents() {
 
@@ -250,12 +250,22 @@ export default function Residents() {
         isSubmitting={isSubmitting}
       />
 
-      <ExcelUploadResidentModal
+      <ExcelImportModal
         isOpen={excelModalOpen}
         onClose={() => setExcelModalOpen(false)}
-        onUploadSuccess={fetchResidents}
-        uploadFunction={uploadResidentsExcel}
-        title="Upload Residents via Excel"
+        title="Import Residents"
+        subtitle="Bulk import residents via Excel"
+        description="Upload an Excel file containing resident details. Residents will belong to your society and receive an activation email to set their password."
+        itemNoun="resident"
+        itemNounPlural="residents"
+        columnsHint="Resident Name, Phone Number, Email, Flat Number, Resident Type"
+        templateCsv="data:text/csv;charset=utf-8,Resident Name,Flat Number,Wing,Phone Number,Email,Resident Type,Status,Move-in Date\nRahul Sharma,A101,A,+91 98765 43210,rahul.sharma@example.com,Owner,ACTIVE,2022-01-15\n"
+        templateFilename="resident_import_template.csv"
+        previewFunction={previewResidentsExcel}
+        importFunction={uploadResidentsExcel}
+        previewExtraColumn={{ label: 'Flat', accessor: 'flatNumber' }}
+        importLabel="Import Residents"
+        onSuccess={fetchResidents}
       />
 
       <DeleteConfirmationModal
