@@ -9,14 +9,11 @@ import {
   MailOpen,
 } from "lucide-react";
 
-import {
-  getNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-} from "../lib/notificationApi.js";
+import { getNotifications } from "../lib/notificationApi.js";
 import { formatDateTime } from "../lib/format.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { complaintDeepLinkRoute } from "../lib/routes.js";
+import { useNotifications } from "../context/NotificationContext.jsx";
 
 const PAGE_SIZE = 10;
 
@@ -30,9 +27,13 @@ const NOTIFICATION_TYPE_STYLES = {
 export default function Notifications() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const { unreadCount, markNotificationRead, markAllNotificationsRead } =
+    useNotifications();
+
   const [notifications, setNotifications] = useState([]);
   const [total, setTotal] = useState(0);
-  const [unread, setUnread] = useState(0);
+  // const [unread, setUnread] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
@@ -50,7 +51,7 @@ export default function Notifications() {
       });
       setNotifications(data.data?.notifications || []);
       setTotal(data.data?.total || 0);
-      setUnread(data.data?.unread || 0);
+      // setUnread(data.data?.unread || 0);
       setTotalPages(data.data?.totalPages || 1);
     } catch (err) {
       setError(err?.response?.data?.message || "Failed to load notifications");
@@ -80,7 +81,7 @@ export default function Notifications() {
   };
 
   const handleMarkAllRead = async () => {
-    if (markingAll || unread === 0) return;
+    if (markingAll || unreadCount  === 0) return;
     setMarkingAll(true);
     try {
       await markAllNotificationsRead();
@@ -127,15 +128,15 @@ export default function Notifications() {
             Notifications
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {unread > 0
-              ? `${unread} unread notification${unread === 1 ? "" : "s"}`
+            {unreadCount  > 0
+              ? `${unreadCount } unread notification${unreadCount  === 1 ? "" : "s"}`
               : "You are all caught up."}
           </p>
         </div>
 
         <button
           onClick={handleMarkAllRead}
-          disabled={markingAll || unread === 0}
+          disabled={markingAll || unreadCount  === 0}
           className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           {markingAll ? (
