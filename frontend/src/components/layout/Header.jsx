@@ -8,6 +8,7 @@ import {
   markAllNotificationsRead,
 } from '../../lib/notificationApi.js';
 import { formatDateTime } from '../../lib/format.js';
+import { NOTIFICATION_ROUTES_BY_ROLE } from '../../lib/routes.js';
 
 /**
  * Route path to user-friendly page title mapping.
@@ -58,14 +59,6 @@ const PAGE_TITLES = {
 
   // Public
   '/register-vendor': 'Vendor Registration',
-};
-
-const NOTIFICATION_ROUTE_BY_ROLE = {
-  SUPER_ADMIN: '/super-admin/notifications',
-  SOCIETY_ADMIN: '/society-admin/notifications',
-  STAFF: '/staff/notifications',
-  RESIDENT: '/resident/notifications',
-  VENDOR: '/vendor/notifications',
 };
 
 const NOTIFICATION_TYPE_STYLES = {
@@ -161,9 +154,22 @@ export default function Header({ onMenuClick }) {
     }
   };
 
+  const handleNotificationClick = async (notification) => {
+    if (!notification.isRead) {
+      await handleMarkRead(notification.id);
+    }
+    // Clicking an individual notification opens the user's Notifications page.
+    // Complaint deep-linking then happens from that page.
+    const route = NOTIFICATION_ROUTES_BY_ROLE[user?.role];
+    if (route) {
+      setDropdownOpen(false);
+      navigate(route);
+    }
+  };
+
   const handleViewAll = () => {
     setDropdownOpen(false);
-    const route = NOTIFICATION_ROUTE_BY_ROLE[user?.role];
+    const route = NOTIFICATION_ROUTES_BY_ROLE[user?.role];
     if (route) navigate(route);
   };
 
@@ -235,7 +241,7 @@ export default function Header({ onMenuClick }) {
                   notifications.map((notification) => (
                     <button
                       key={notification.id}
-                      onClick={() => handleMarkRead(notification.id)}
+                      onClick={() => handleNotificationClick(notification)}
                       className={`w-full text-left px-4 py-3 flex items-start gap-3 transition-colors hover:bg-slate-50 ${
                         notification.isRead ? 'bg-white' : 'bg-indigo-50/40'
                       }`}

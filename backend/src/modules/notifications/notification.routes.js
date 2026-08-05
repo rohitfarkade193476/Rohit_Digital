@@ -5,8 +5,11 @@ import {
   markNotificationReadHandler,
   markAllNotificationsReadHandler,
 } from "./notification.controller.js";
+import pushRoutes from "./push.routes.js";
 
 const router = Router();
+
+router.use("/push", pushRoutes);
 
 router.get("/", requireAuth, getMyNotificationsHandler);
 

@@ -1,36 +1,38 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Briefcase, Loader2, AlertCircle, ChevronRight } from 'lucide-react';
-import { getMyAssignments } from '../../lib/assignmentApi.js';
-import { formatDate } from '../../lib/format.js';
-import AssignmentStatusBadge from '../../components/vendor/AssignmentStatusBadge.jsx';
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Briefcase, Loader2, AlertCircle, ChevronRight } from "lucide-react";
+import { getMyAssignments } from "../../lib/assignmentApi.js";
+import { formatDate } from "../../lib/format.js";
+import AssignmentStatusBadge from "../../components/vendor/AssignmentStatusBadge.jsx";
 
 const STATUS_TABS = [
-  { value: 'ALL', label: 'All' },
-  { value: 'ASSIGNED', label: 'New' },
-  { value: 'ACCEPTED', label: 'Accepted' },
-  { value: 'IN_PROGRESS', label: 'In Progress' },
-  { value: 'COMPLETED', label: 'Completed' },
-  { value: 'CANCELLED', label: 'Cancelled' },
+  { value: "ALL", label: "All" },
+  { value: "ASSIGNED", label: "New" },
+  { value: "ACCEPTED", label: "Accepted" },
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+  { value: "CANCELLED", label: "Cancelled" },
 ];
 
 export default function VendorAssignments() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const deepLinkComplaintId = searchParams.get("complaint");
 
   const [assignments, setAssignments] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState('');
-  const [activeStatus, setActiveStatus] = useState('ALL');
+  const [fetchError, setFetchError] = useState("");
+  const [activeStatus, setActiveStatus] = useState("ALL");
 
   const fetchAssignments = useCallback(async () => {
     try {
       setIsLoading(true);
-      setFetchError('');
+      setFetchError("");
       const data = await getMyAssignments();
       setAssignments(data.data || []);
     } catch (err) {
       setFetchError(
-        err?.response?.data?.message || 'Failed to load assignments'
+        err?.response?.data?.message || "Failed to load assignments",
       );
     } finally {
       setIsLoading(false);
@@ -41,14 +43,39 @@ export default function VendorAssignments() {
     fetchAssignments();
   }, [fetchAssignments]);
 
+  // Deep link from a notification: map the complaintId to this vendor's
+  // assignment and open the existing assignment detail route.
+  useEffect(() => {
+    if (isLoading || !deepLinkComplaintId) return;
+    const complaintId = String(deepLinkComplaintId).trim();
+
+    const match = assignments.find(
+      (a) => String(a.complaint?.id || "").trim() === complaintId,
+    );
+    console.log("Vendor notification deep link:", {
+      deepLinkComplaintId: complaintId,
+      assignments,
+      matchedAssignment: match,
+    });
+
+    if (match?.id) {
+      navigate(`/vendor/assignments/${match.id}`, { replace: true });
+    } else {
+      console.warn(
+        "No vendor assignment found for complaint:",
+        complaintId,
+      );
+    }
+  }, [isLoading, assignments, deepLinkComplaintId, navigate]);
+
   const filteredAssignments =
-    activeStatus === 'ALL'
+    activeStatus === "ALL"
       ? assignments
       : assignments.filter((a) => a.status === activeStatus);
 
   const counts = STATUS_TABS.reduce((acc, tab) => {
     acc[tab.value] =
-      tab.value === 'ALL'
+      tab.value === "ALL"
         ? assignments.length
         : assignments.filter((a) => a.status === tab.value).length;
     return acc;
@@ -82,16 +109,16 @@ export default function VendorAssignments() {
             onClick={() => setActiveStatus(tab.value)}
             className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               activeStatus === tab.value
-                ? 'bg-indigo-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
             }`}
           >
             {tab.label}
             <span
               className={`px-1.5 rounded-full text-[10px] font-bold ${
                 activeStatus === tab.value
-                  ? 'bg-white/20 text-white'
-                  : 'bg-slate-100 text-slate-500'
+                  ? "bg-white/20 text-white"
+                  : "bg-slate-100 text-slate-500"
               }`}
             >
               {counts[tab.value] || 0}
@@ -111,9 +138,9 @@ export default function VendorAssignments() {
           <div className="p-12 text-center">
             <Briefcase className="w-10 h-10 text-slate-300 mx-auto mb-3" />
             <p className="text-sm text-slate-500">
-              {activeStatus === 'ALL'
-                ? 'No assignments yet.'
-                : 'No assignments in this status.'}
+              {activeStatus === "ALL"
+                ? "No assignments yet."
+                : "No assignments in this status."}
             </p>
           </div>
         ) : (
@@ -140,14 +167,14 @@ export default function VendorAssignments() {
                         {a.complaint?.title}
                       </div>
                       <div className="text-xs text-slate-400 mt-0.5">
-                        {a.complaint?.category} • Priority{' '}
-                        {(a.complaint?.priority || 'MEDIUM')
+                        {a.complaint?.category} • Priority{" "}
+                        {(a.complaint?.priority || "MEDIUM")
                           .toLowerCase()
-                          .replace(/_/g, ' ')}
+                          .replace(/_/g, " ")}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-xs text-slate-600">
-                      {a.society?.name || 'Housing Society'}
+                      {a.society?.name || "Housing Society"}
                       {a.society?.societyCode && (
                         <span className="block text-slate-400 font-mono">
                           {a.society.societyCode}

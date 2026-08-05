@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 import ComplaintStats from '../components/complaints/ComplaintStats.jsx';
@@ -6,7 +7,7 @@ import ComplaintFilters from '../components/complaints/ComplaintFilters.jsx';
 import ComplaintTable from '../components/complaints/ComplaintTable.jsx';
 import ComplaintDetailsDrawer from '../components/complaints/ComplaintDetailsDrawer.jsx';
 import AssignComplaintModal from '../components/complaints/AssignComplaintModal.jsx';
-import { getComplaints } from '../lib/complaintApi.js';
+import { getComplaints, getComplaintById } from '../lib/complaintApi.js';
 import {
   assignVendorToComplaint,
   assignStaffToComplaint,
@@ -18,6 +19,8 @@ import { getAllStaff } from '../lib/staffApi.js';
 const PAGE_SIZE = 10;
 
 export default function ComplaintManagement() {
+  const [searchParams] = useSearchParams();
+  const deepLinkComplaintId = searchParams.get('complaint');
   const [complaints, setComplaints] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -84,6 +87,28 @@ export default function ComplaintManagement() {
   useEffect(() => {
     fetchComplaints();
   }, [fetchComplaints]);
+
+  // Deep link from a notification: fetch the exact complaint (may not be on the
+  // current list page) and open it in the existing drawer.
+  useEffect(() => {
+    if (!deepLinkComplaintId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await getComplaintById(deepLinkComplaintId);
+        if (!cancelled && res?.data) {
+          await handleOpenDrawer(res.data);
+        }
+      } catch {
+        // Not accessible to this admin — do not open the drawer.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [deepLinkComplaintId]);
 
   // Load assignable vendors once (for the Assign Vendor modal)
   const fetchVendors = useCallback(async () => {

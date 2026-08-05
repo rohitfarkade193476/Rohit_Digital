@@ -51,7 +51,7 @@ router.get(
 router.get(
   "/:id",
   requireAuth,
-  requireRole("RESIDENT", "SOCIETY_ADMIN"),
+  requireRole("RESIDENT", "SOCIETY_ADMIN", "STAFF"),
   getComplaintByIdHandler,
 );
 

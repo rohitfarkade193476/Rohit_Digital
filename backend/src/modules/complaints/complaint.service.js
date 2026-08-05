@@ -1,4 +1,5 @@
 import prisma from "../../config/prisma.js";
+import { createNotification } from "../notifications/notification.service.js";
 
 const COMPLAINT_INCLUDE = {
   resident: {
@@ -161,6 +162,19 @@ const getSocietyIdForUser = async (userId) => {
   return user?.societyId || null;
 };
 
+/**
+ * Resolve the userId of the Society Admin responsible for a society.
+ * Used to route "notify the admin" notifications without trusting any
+ * userId coming from the request.
+ */
+export const getSocietyAdminId = async (societyId) => {
+  const admin = await prisma.user.findFirst({
+    where: { societyId, role: "SOCIETY_ADMIN" },
+    select: { id: true },
+  });
+  return admin?.id || null;
+};
+
 export const createComplaint = async (user, data) => {
   const societyId = await getSocietyIdForUser(user.id);
   if (!societyId) return { forbidden: true };
@@ -229,6 +243,25 @@ export const createComplaint = async (user, data) => {
     include: COMPLAINT_INCLUDE,
   });
 
+  // When a resident raises a complaint, notify the society admin. Best-effort
+  // side effect — a notification failure must never fail complaint creation.
+  if (user.role === "RESIDENT") {
+    try {
+      const adminId = await getSocietyAdminId(societyId);
+      if (adminId) {
+        await createNotification({
+          userId: adminId,
+          type: "COMPLAINT_CREATED",
+          title: "New complaint raised",
+          message: `"${data.title}" was raised by a resident in your society`,
+          complaintId: complaint.id,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create complaint notification:", error);
+    }
+  }
+
   return mapComplaint(full);
 };
 
@@ -293,6 +326,19 @@ export const getComplaintById = async (id, user) => {
       select: { id: true },
     });
     if (!resident || complaint.residentId !== resident.id) return null;
+  } else if (user.role === "STAFF") {
+    // Staff may only view complaints assigned to them — never the whole
+    // society's complaints. Existing authorization stays the source of truth.
+    const staff = await prisma.staff.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!staff) return null;
+    const assignment = await prisma.staffAssignment.findFirst({
+      where: { complaintId: complaint.id, staffId: staff.id },
+      select: { id: true },
+    });
+    if (!assignment) return null;
   } else {
     const societyId = await getSocietyIdForUser(user.id);
     if (complaint.societyId !== societyId) return null;
@@ -404,7 +450,7 @@ export const reopenComplaint = async (complaintId, user, { note } = {}) => {
 
   const complaint = await prisma.complaint.findFirst({
     where: { id: complaintId, societyId },
-    select: { id: true, residentId: true, status: true },
+    select: { id: true, residentId: true, status: true, societyId: true },
   });
 
   if (!complaint) return { notFound: true };
@@ -446,6 +492,23 @@ export const reopenComplaint = async (complaintId, user, { note } = {}) => {
     include: COMPLAINT_INCLUDE,
   });
 
+  // Notify the society admin that a resident reopened the complaint.
+  // Best-effort side effect — a notification failure must never fail reopen.
+  try {
+    const adminId = await getSocietyAdminId(complaint.societyId);
+    if (adminId) {
+      await createNotification({
+        userId: adminId,
+        type: "COMPLAINT_REOPENED",
+        title: "Complaint reopened",
+        message: `"${full.title}" was reopened by the resident`,
+        complaintId,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to create complaint reopened notification:", error);
+  }
+
   return mapComplaint(full);
 };
 
@@ -463,7 +526,7 @@ export const changeComplaintStatus = async (
 
   const complaint = await prisma.complaint.findFirst({
     where: { id: complaintId, societyId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, residentId: true },
   });
 
   if (!complaint) return { notFound: true };
@@ -479,6 +542,28 @@ export const changeComplaintStatus = async (
     where: { id: complaintId },
     include: COMPLAINT_INCLUDE,
   });
+
+  // Notify the resident when their complaint is closed. Best-effort side
+  // effect — a notification failure must never fail the status change.
+  if (newStatus === "CLOSED" && full?.residentId) {
+    try {
+      const resident = await prisma.resident.findUnique({
+        where: { id: full.residentId },
+        select: { userId: true },
+      });
+      if (resident?.userId) {
+        await createNotification({
+          userId: resident.userId,
+          type: "COMPLAINT_CLOSED",
+          title: "Complaint closed",
+          message: `Your complaint "${full.title}" has been closed`,
+          complaintId,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create complaint closed notification:", error);
+    }
+  }
 
   return mapComplaint(full);
 };

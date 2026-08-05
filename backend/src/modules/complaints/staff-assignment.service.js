@@ -185,6 +185,7 @@ export const assignStaffToComplaint = async (complaintId, staffId, adminUserId) 
       type: "STAFF_ASSIGNMENT",
       title: "New work assignment",
       message: `You have been assigned to complaint "${complaint.title}"`,
+      complaintId,
     });
   } catch (error) {
     console.error("Failed to create staff assignment notification:", error);

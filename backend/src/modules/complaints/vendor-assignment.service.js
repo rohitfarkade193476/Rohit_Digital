@@ -1,6 +1,6 @@
 import prisma from "../../config/prisma.js";
 import { createNotification } from "../notifications/notification.service.js";
-import { recordStatusChange } from "./complaint.service.js";
+import { recordStatusChange, getSocietyAdminId } from "./complaint.service.js";
 import { getComplaintStaffAssignments } from "./staff-assignment.service.js";
 
 const ACTIVE_STATUSES = ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"];
@@ -216,6 +216,7 @@ export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId
       type: "VENDOR_ASSIGNMENT",
       title: "New work assignment",
       message: `You have been assigned to complaint "${complaint.title}"`,
+      complaintId,
     });
   } catch (error) {
     console.error("Failed to create vendor assignment notification:", error);
@@ -368,6 +369,27 @@ export const updateVendorAssignmentStatus = async (
       include: ASSIGNMENT_INCLUDE,
     });
   });
+
+  // Notify the society admin when a vendor accepts or rejects an assignment.
+  // Best-effort side effect — a notification failure must never fail the
+  // status update itself.
+  if (status === "ACCEPTED" || status === "CANCELLED") {
+    try {
+      const adminId = await getSocietyAdminId(updated.societyId);
+      if (adminId) {
+        const verb = status === "ACCEPTED" ? "accepted" : "rejected";
+        await createNotification({
+          userId: adminId,
+          type: status === "ACCEPTED" ? "VENDOR_ACCEPTED" : "VENDOR_REJECTED",
+          title: `Vendor ${verb} the assignment`,
+          message: `${updated.vendor.companyName} ${verb} the work for complaint "${updated.complaint.title}"`,
+          complaintId: updated.complaintId,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to create vendor assignment update notification:", error);
+    }
+  }
 
   return { assignment: mapAssignment(updated) };
 };
