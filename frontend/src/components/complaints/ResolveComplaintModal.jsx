@@ -8,7 +8,9 @@ import {
   Trash2,
   Loader2,
   FileCheck,
+  Camera,
 } from 'lucide-react';
+import { resolveImageUrl } from '../../lib/format.js';
 
 const MAX_FILE_SIZE_MB = 5;
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -79,6 +81,7 @@ export default function ResolveComplaintModal({
       onResolve(complaint.id, {
         imageFile: selectedFile,
         imagePreviewUrl: imagePreview,
+        afterImageUrl: imagePreview,
         resolutionNote: resolutionNote.trim(),
       });
     }
@@ -124,10 +127,29 @@ export default function ResolveComplaintModal({
               <p className="text-slate-500 mt-0.5">Category: {complaint.category}</p>
             </div>
 
-            {/* Resolution Image Upload */}
+            {/* Before Resolution Image (from the original complaint) */}
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                Resolution Evidence Image *
+                Before Resolution Image
+              </label>
+              {resolveImageUrl(complaint.imageUrl) ? (
+                <img
+                  src={resolveImageUrl(complaint.imageUrl)}
+                  alt="Before resolution"
+                  className="w-full h-40 object-cover rounded-xl border border-slate-200 shadow-sm"
+                />
+              ) : (
+                <div className="flex items-center gap-2.5 px-4 py-5 rounded-xl border border-dashed border-slate-300 bg-slate-50/50 text-xs text-slate-400">
+                  <Camera className="w-4 h-4 shrink-0 text-slate-300" />
+                  <span>No before image was attached to this complaint.</span>
+                </div>
+              )}
+            </div>
+
+            {/* After Resolution Image Upload */}
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                After Resolution Image *
               </label>
 
               {imagePreview ? (
@@ -157,7 +179,7 @@ export default function ResolveComplaintModal({
                     <Upload className="w-5 h-5" />
                   </div>
                   <p className="text-xs font-semibold text-slate-700">
-                    Click to upload work completion proof
+                    Click to upload the after resolution image
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     JPG, PNG, WebP or GIF up to {MAX_FILE_SIZE_MB}MB

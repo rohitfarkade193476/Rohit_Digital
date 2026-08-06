@@ -24,6 +24,7 @@ import {
 } from '../../lib/format.js';
 import AssignmentStatusBadge from '../../components/vendor/AssignmentStatusBadge.jsx';
 import StatusTimeline from '../../components/complaints/StatusTimeline.jsx';
+import BeforeAfterImages from '../../components/complaints/BeforeAfterImages.jsx';
 import ResolveComplaintModal from '../../components/complaints/ResolveComplaintModal.jsx';
 
 export default function VendorAssignmentDetail() {
@@ -92,6 +93,7 @@ export default function VendorAssignmentDetail() {
       await updateMyAssignmentStatus(assignment.id, 'COMPLETED');
       if (assignment?.complaint) {
         assignment.complaint.resolutionImage = resolutionData.imagePreviewUrl;
+        assignment.complaint.afterImageUrl = resolutionData.afterImageUrl || resolutionData.imagePreviewUrl;
         assignment.complaint.resolutionNote = resolutionData.resolutionNote;
       }
       setSuccessMessage('Assignment completed with resolution evidence.');
@@ -304,6 +306,23 @@ export default function VendorAssignmentDetail() {
           assignedVendor={assignment.vendor}
           isLoading={false}
         />
+      </div>
+
+      {/* Before / After Resolution Images */}
+      <div className="bg-white rounded-xl border border-slate-200/80 p-6 shadow-sm space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+          Resolution Evidence & Proof
+        </h3>
+        <BeforeAfterImages
+          beforeImage={complaint.imageUrl}
+          afterImage={complaint.afterImageUrl || complaint.resolutionImage}
+        />
+        {complaint.resolutionNote && (
+          <div className="bg-emerald-50/50 p-3.5 rounded-lg border border-emerald-100 text-xs text-slate-700">
+            <span className="font-bold text-slate-900 block mb-1">Resolution Note:</span>
+            <p className="leading-relaxed">{complaint.resolutionNote}</p>
+          </div>
+        )}
       </div>
 
       {/* Status Actions */}
