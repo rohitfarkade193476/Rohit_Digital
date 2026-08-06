@@ -90,7 +90,11 @@ export default function VendorAssignmentDetail() {
     setIsUpdating(true);
     setActionError('');
     try {
-      await updateMyAssignmentStatus(assignment.id, 'COMPLETED');
+      await updateMyAssignmentStatus(
+        assignment.id,
+        'COMPLETED',
+        resolutionData.imageFile
+      );
       if (assignment?.complaint) {
         assignment.complaint.resolutionImage = resolutionData.imagePreviewUrl;
         assignment.complaint.afterImageUrl = resolutionData.afterImageUrl || resolutionData.imagePreviewUrl;
@@ -101,6 +105,7 @@ export default function VendorAssignmentDetail() {
       fetchAssignment();
     } catch (err) {
       setActionError(err?.response?.data?.message || 'Failed to complete assignment.');
+      setResolveModalOpen(true);
     } finally {
       setIsUpdating(false);
     }

@@ -90,6 +90,7 @@ const mapComplaint = (complaint) => {
     priority: complaint.priority,
     status: complaint.status,
     imageUrl: complaint.imageUrl || null,
+    afterImageUrl: complaint.afterImageUrl || null,
     satisfiedAt: complaint.satisfiedAt || null,
     satisfactionNote: complaint.satisfactionNote || null,
     residentId: complaint.residentId,
@@ -358,7 +359,8 @@ export const recordStatusChange = async (
   complaintId,
   newStatus,
   userId,
-  note
+  note,
+  extraData = {}
 ) => {
   const complaint = await tx.complaint.findUnique({
     where: { id: complaintId },
@@ -377,7 +379,7 @@ export const recordStatusChange = async (
 
   await tx.complaint.update({
     where: { id: complaintId },
-    data: { status: newStatus },
+    data: { status: newStatus, ...extraData },
   });
 
   await tx.complaintStatusHistory.create({

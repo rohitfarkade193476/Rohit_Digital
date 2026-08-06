@@ -44,6 +44,8 @@ const ASSIGNMENT_INCLUDE = {
       category: true,
       priority: true,
       status: true,
+      imageUrl: true,
+      afterImageUrl: true,
       resident: {
         select: {
           id: true,
@@ -90,6 +92,8 @@ const mapAssignment = (assignment) => ({
     category: assignment.complaint.category,
     priority: assignment.complaint.priority,
     status: assignment.complaint.status,
+    imageUrl: assignment.complaint.imageUrl || null,
+    afterImageUrl: assignment.complaint.afterImageUrl || null,
     resident: assignment.complaint.resident
       ? {
           name: assignment.complaint.resident.user.name,
@@ -126,7 +130,11 @@ const getVendorIdForUser = async (userId) => {
  * society. The society is always derived from the authenticated admin's
  * user record — never from the request body.
  */
-export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId) => {
+export const assignVendorToComplaint = async (
+  complaintId,
+  vendorId,
+  adminUserId,
+) => {
   const societyId = await getAdminSocietyId(adminUserId);
   if (!societyId) return { forbidden: true };
 
@@ -218,6 +226,21 @@ export const assignVendorToComplaint = async (complaintId, vendorId, adminUserId
       message: `You have been assigned to complaint "${complaint.title}"`,
       complaintId,
     });
+
+    const resident = await prisma.resident.findUnique({
+      where: { id: fullAssignment.complaint.resident.id },
+      select: { userId: true },
+    });
+
+    if (resident?.userId) {
+      await createNotification({
+        userId: resident.userId,
+        type: "VENDOR_ASSIGNED",
+        title: "Vendor assigned",
+        message: `A vendor has been assigned to your complaint "${complaint.title}"`,
+        complaintId,
+      });
+    }
   } catch (error) {
     console.error("Failed to create vendor assignment notification:", error);
   }
@@ -248,7 +271,8 @@ export const getComplaintAssignments = async (complaintId, adminUserId) => {
     ...vendorAssignments.map(mapAssignment),
     ...(staffResult?.assignments || []),
   ].sort(
-    (a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime()
+    (a, b) =>
+      new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime(),
   );
 
   return { assignments };
@@ -284,7 +308,8 @@ export const getVendorAssignmentById = async (userId, assignmentId) => {
 export const updateVendorAssignmentStatus = async (
   userId,
   assignmentId,
-  status
+  status,
+  { afterImageUrl } = {},
 ) => {
   const vendorId = await getVendorIdForUser(userId);
   if (!vendorId) return { forbidden: true };
@@ -304,16 +329,27 @@ export const updateVendorAssignmentStatus = async (
   }
 
   // Pre-check complaint status transition before entering the transaction.
-  if (status === "ACCEPTED" || status === "COMPLETED" || status === "CANCELLED") {
+  if (
+    status === "ACCEPTED" ||
+    status === "COMPLETED" ||
+    status === "CANCELLED"
+  ) {
     const complaint = await prisma.complaint.findUnique({
       where: { id: assignment.complaintId },
       select: { status: true },
     });
     const targetComplaintStatus =
-      status === "ACCEPTED" ? "IN_PROGRESS" :
-      status === "COMPLETED" ? "RESOLVED" : "OPEN";
+      status === "ACCEPTED"
+        ? "IN_PROGRESS"
+        : status === "COMPLETED"
+          ? "RESOLVED"
+          : "OPEN";
 
-    if (!VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes(targetComplaintStatus)) {
+    if (
+      !VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes(
+        targetComplaintStatus,
+      )
+    ) {
       return {
         invalidTransition: true,
         message: `Cannot change complaint status from ${complaint.status} to ${targetComplaintStatus}`,
@@ -340,7 +376,7 @@ export const updateVendorAssignmentStatus = async (
         assignment.complaintId,
         "IN_PROGRESS",
         userId,
-        "Vendor accepted the assignment"
+        "Vendor accepted the assignment",
       );
     } else if (status === "COMPLETED") {
       complaintStatusResult = await recordStatusChange(
@@ -348,7 +384,8 @@ export const updateVendorAssignmentStatus = async (
         assignment.complaintId,
         "RESOLVED",
         userId,
-        "Work completed by vendor"
+        "Work completed by vendor",
+        afterImageUrl ? { afterImageUrl } : {},
       );
     } else if (status === "CANCELLED") {
       complaintStatusResult = await recordStatusChange(
@@ -356,7 +393,7 @@ export const updateVendorAssignmentStatus = async (
         assignment.complaintId,
         "OPEN",
         userId,
-        "Vendor assignment cancelled"
+        "Vendor assignment cancelled",
       );
     }
 
@@ -378,6 +415,7 @@ export const updateVendorAssignmentStatus = async (
       const adminId = await getSocietyAdminId(updated.societyId);
       if (adminId) {
         const verb = status === "ACCEPTED" ? "accepted" : "rejected";
+
         await createNotification({
           userId: adminId,
           type: status === "ACCEPTED" ? "VENDOR_ACCEPTED" : "VENDOR_REJECTED",
@@ -387,7 +425,82 @@ export const updateVendorAssignmentStatus = async (
         });
       }
     } catch (error) {
-      console.error("Failed to create vendor assignment update notification:", error);
+      console.error(
+        "Failed to create vendor assignment update notification:",
+        error,
+      );
+    }
+  }
+
+  // Notify the society admin when the vendor starts work. Best-effort side
+  // effect — a notification failure must never fail the status update.
+  if (status === "IN_PROGRESS") {
+    try {
+      const adminId = await getSocietyAdminId(updated.societyId);
+      if (adminId) {
+        await createNotification({
+          userId: adminId,
+          type: "VENDOR_IN_PROGRESS",
+          title: "Vendor started work",
+          message: `${updated.vendor.companyName} started work on complaint "${updated.complaint.title}"`,
+          complaintId: updated.complaintId,
+        });
+
+        const resident = await prisma.resident.findUnique({
+          where: { id: updated.complaint.resident.id },
+          select: { userId: true },
+        });
+
+        if (resident?.userId) {
+          await createNotification({
+            userId: resident.userId,
+            type: "VENDOR_IN_PROGRESS",
+            title: "Vendor started work",
+            message: `${updated.vendor.companyName} started work on your complaint "${updated.complaint.title}"`,
+            complaintId: updated.complaintId,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to create vendor start-work notification:", error);
+    }
+  }
+
+  // When the vendor completes the assignment, notify the resident that their
+  // complaint has been resolved and the society admin of the completion.
+  // Best-effort side effects — a notification failure must never fail the
+  // status update.
+  if (status === "COMPLETED") {
+    try {
+      const resident = await prisma.resident.findUnique({
+        where: { id: updated.complaint.resident.id },
+        select: { userId: true },
+      });
+      if (resident?.userId) {
+        await createNotification({
+          userId: resident.userId,
+          type: "COMPLAINT_RESOLVED",
+          title: "Complaint resolved",
+          message: `Your complaint "${updated.complaint.title}" has been resolved by ${updated.vendor.companyName}`,
+          complaintId: updated.complaintId,
+        });
+      }
+
+      const adminId = await getSocietyAdminId(updated.societyId);
+      if (adminId) {
+        await createNotification({
+          userId: adminId,
+          type: "COMPLAINT_RESOLVED",
+          title: "Complaint resolved",
+          message: `${updated.vendor.companyName} resolved complaint "${updated.complaint.title}"`,
+          complaintId: updated.complaintId,
+        });
+      }
+    } catch (error) {
+      console.error(
+        "Failed to create complaint resolved notifications:",
+        error,
+      );
     }
   }
 

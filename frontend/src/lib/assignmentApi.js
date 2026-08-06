@@ -22,11 +22,25 @@ export async function getMyAssignmentById(id) {
 
 /**
  * Update an assignment status (ASSIGNED -> ACCEPTED/CANCELLED -> IN_PROGRESS -> COMPLETED).
+ * When completing with an after-resolution image, pass the selected File so it
+ * is uploaded once with the status update and persisted by the backend.
  * @param {string} id
  * @param {string} status
+ * @param {File|null|undefined} [afterImageFile]
  * @returns {Promise<{ success: boolean, message: string, data: { assignment: object } }>}
  */
-export async function updateMyAssignmentStatus(id, status) {
+export async function updateMyAssignmentStatus(id, status, afterImageFile) {
+  if (afterImageFile) {
+    const formData = new FormData();
+    formData.append('status', status);
+    formData.append('afterImage', afterImageFile);
+    const response = await axiosInstance.patch(
+      `/api/vendor/assignments/${id}/status`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+  }
   const response = await axiosInstance.patch(
     `/api/vendor/assignments/${id}/status`,
     { status }
