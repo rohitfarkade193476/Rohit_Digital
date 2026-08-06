@@ -84,10 +84,15 @@ export const getMyAssignmentHandler = asyncHandler(async (req, res) => {
 });
 
 export const updateMyAssignmentStatusHandler = asyncHandler(async (req, res) => {
+  const afterImageUrl = req.file
+    ? `/uploads/complaints/${req.file.filename}`
+    : (req.body.afterImageUrl || null);
+
   const result = await updateVendorAssignmentStatus(
     req.user.id,
     req.params.id,
-    req.body.status
+    req.body.status,
+    { afterImageUrl }
   );
 
   if (result.forbidden) {

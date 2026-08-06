@@ -9,4 +9,9 @@ export const updateAssignmentStatusValidation = [
     .withMessage("Status is required")
     .isIn(VALID_STATUSES)
     .withMessage(`Status must be one of: ${VALID_STATUSES.join(", ")}`),
+  body("afterImageUrl")
+    .optional({ values: "falsy" })
+    .trim()
+    .isString()
+    .withMessage("afterImageUrl must be a string"),
 ];

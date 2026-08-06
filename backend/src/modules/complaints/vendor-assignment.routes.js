@@ -2,6 +2,7 @@ import { Router } from "express";
 import { requireAuth } from "../../middlewares/requireAuth.js";
 import { requireRole } from "../../middlewares/requireRole.js";
 import { validate } from "../../middlewares/validate.js";
+import uploadComplaintImage from "../../middlewares/complaintUpload.middleware.js";
 import { updateAssignmentStatusValidation } from "./validators/updateAssignmentStatus.validator.js";
 import {
   listMyAssignmentsHandler,
@@ -29,6 +30,7 @@ router.patch(
   "/:id/status",
   requireAuth,
   requireRole("VENDOR"),
+  uploadComplaintImage.single("afterImage"),
   updateAssignmentStatusValidation,
   validate,
   updateMyAssignmentStatusHandler,
