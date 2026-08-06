@@ -221,11 +221,13 @@ model Complaint {
   title       String
   description String?
   category    String
-  priority    ComplaintPriority @default(MEDIUM)
-  status      ComplaintStatus   @default(OPEN)
-  imageUrl    String?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  priority         ComplaintPriority @default(MEDIUM)
+  status           ComplaintStatus   @default(OPEN)
+  imageUrl         String?
+  satisfiedAt      DateTime?
+  satisfactionNote String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   society           Society                  @relation(fields: [societyId], references: [id], onDelete: Cascade)
   resident          Resident                 @relation(fields: [residentId], references: [id], onDelete: Cascade)

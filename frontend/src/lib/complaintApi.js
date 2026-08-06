@@ -86,3 +86,14 @@ export async function changeComplaintStatus(id, status, note) {
   const response = await axiosInstance.patch(`/api/complaints/${id}/status`, { status, note });
   return response.data;
 }
+
+/**
+ * Record resident satisfaction for a resolved/closed complaint (RESIDENT only).
+ * @param {string} id
+ * @param {object} [body] - optional { note }
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function markSatisfied(id, body = {}) {
+  const response = await axiosInstance.post(`/api/complaints/${id}/satisfaction`, body);
+  return response.data;
+}

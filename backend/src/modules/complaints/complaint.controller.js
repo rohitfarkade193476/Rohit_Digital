@@ -5,6 +5,7 @@ import {
   getComplaintHistory,
   reopenComplaint,
   changeComplaintStatus,
+  markSatisfied,
 } from "./complaint.service.js";
 
 import {
@@ -88,4 +89,16 @@ export const changeComplaintStatusHandler = asyncHandler(async (req, res) => {
   if (result.invalidTransition) return errorResponse(res, 422, result.message);
 
   return successResponse(res, 200, "Complaint status updated successfully", result);
+});
+
+export const markSatisfiedHandler = asyncHandler(async (req, res) => {
+  const result = await markSatisfied(req.params.id, req.user, {
+    note: req.body.note,
+  });
+
+  if (result.forbidden) return errorResponse(res, 403, "Forbidden");
+  if (result.notFound) return errorResponse(res, 404, "Complaint not found");
+  if (result.invalidTransition) return errorResponse(res, 422, result.message);
+
+  return successResponse(res, 200, "Satisfaction recorded successfully", result);
 });
