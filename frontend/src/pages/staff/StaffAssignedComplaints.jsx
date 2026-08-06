@@ -197,6 +197,7 @@ export default function StaffAssignedComplaints() {
             ...c,
             status: 'RESOLVED',
             resolutionImage: resolutionData.imagePreviewUrl,
+            afterImageUrl: resolutionData.afterImageUrl || resolutionData.imagePreviewUrl,
             resolutionNote: resolutionData.resolutionNote,
             statusHistory: newHistory,
           };

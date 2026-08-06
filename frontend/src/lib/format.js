@@ -56,3 +56,20 @@ export function formatDateTime(value) {
     minute: '2-digit',
   });
 }
+
+/**
+ * Turn a backend-relative image path (e.g. "/uploads/complaints/xyz.jpg") into
+ * an absolute URL the browser can load. Data URIs, blob URLs, and absolute
+ * http(s) URLs pass through unchanged. Returns null for falsy input.
+ * @param {string|null|undefined} src
+ * @returns {string|null}
+ */
+export function resolveImageUrl(src) {
+  if (!src) return null;
+  if (/^(data:|blob:|https?:)/i.test(src)) return src;
+  if (String(src).startsWith('/uploads/')) {
+    const base = import.meta.env.VITE_API_URL ?? 'http://localhost:5000';
+    return `${base}${src}`;
+  }
+  return src;
+}

@@ -19,10 +19,10 @@ import {
   Check,
   Shield,
   ThumbsUp,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { formatDateTime } from '../../lib/format.js';
 import StatusTimeline from './StatusTimeline.jsx';
+import BeforeAfterImages from './BeforeAfterImages.jsx';
 import ReopenComplaintModal from './ReopenComplaintModal.jsx';
 import AssignComplaintModal from './AssignComplaintModal.jsx';
 import ResolveComplaintModal from './ResolveComplaintModal.jsx';
@@ -166,6 +166,7 @@ export default function ComplaintDetailsDrawer({
     } else {
       complaint.status = 'RESOLVED';
       complaint.resolutionImage = resolutionData.imagePreviewUrl;
+      complaint.afterImageUrl = resolutionData.afterImageUrl || resolutionData.imagePreviewUrl;
       complaint.resolutionNote = resolutionData.resolutionNote;
       if (onStatusUpdated) onStatusUpdated();
     }
@@ -332,35 +333,27 @@ export default function ComplaintDetailsDrawer({
                     )}
                   </div>
 
-                  {/* Resolution Evidence Card (Shown if RESOLVED or CLOSED) */}
-                  {(currentStatus === 'RESOLVED' || currentStatus === 'CLOSED' || complaint.resolutionNote) && (
-                    <div className="bg-emerald-50/40 rounded-xl border border-emerald-200/80 p-5 shadow-sm space-y-3">
-                      <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        <span>Resolution Evidence & Proof</span>
-                      </div>
+                  {/* Before / After Resolution Images */}
+                  <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+                    <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                      <span>Resolution Evidence & Proof</span>
+                    </div>
 
-                      {complaint.resolutionImage && (
-                        <div>
-                          <p className="text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
-                            <ImageIcon className="w-3.5 h-3.5 text-slate-400" /> Attached Photo:
-                          </p>
-                          <img
-                            src={complaint.resolutionImage}
-                            alt="Resolution Evidence"
-                            className="max-h-56 rounded-xl border border-slate-200 object-cover shadow-sm"
-                          />
-                        </div>
-                      )}
+                    <BeforeAfterImages
+                      beforeImage={complaint.imageUrl}
+                      afterImage={complaint.afterImageUrl || complaint.resolutionImage}
+                    />
 
-                      <div className="bg-white p-3.5 rounded-lg border border-emerald-100 text-xs text-slate-700">
+                    {(complaint.resolutionNote || currentStatus === 'RESOLVED' || currentStatus === 'CLOSED') && (
+                      <div className="bg-emerald-50/50 p-3.5 rounded-lg border border-emerald-100 text-xs text-slate-700">
                         <span className="font-bold text-slate-900 block mb-1">Resolution Note:</span>
                         <p className="leading-relaxed">
                           {complaint.resolutionNote || 'Work completed successfully according to society standards.'}
                         </p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Assignment History */}
                   <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-3">
