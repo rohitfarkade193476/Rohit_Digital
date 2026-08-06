@@ -1,5 +1,6 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import LandingPage from "./pages/LandingPage.jsx";
 
 import Login from "./pages/Login.jsx";
 import RegisterSociety from "./pages/RegisterSociety.jsx";
@@ -51,7 +52,7 @@ export default function App() {
 
       {/* Guest Routes — redirect to role dashboard if already authenticated */}
       <Route element={<GuestRoute />}>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register-society" element={<RegisterSociety />} />
       </Route>
