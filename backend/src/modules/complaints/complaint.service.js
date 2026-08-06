@@ -67,7 +67,7 @@ const VALID_COMPLAINT_TRANSITIONS = {
   IN_PROGRESS: ["RESOLVED", "REOPENED", "OPEN"],
   RESOLVED: ["CLOSED", "REOPENED"],
   CLOSED: ["REOPENED"],
-  REOPENED: ["ASSIGNED"],
+  REOPENED: ["ASSIGNED", "IN_PROGRESS"],
 };
 
 const mapComplaint = (complaint) => {
@@ -90,6 +90,8 @@ const mapComplaint = (complaint) => {
     priority: complaint.priority,
     status: complaint.status,
     imageUrl: complaint.imageUrl || null,
+    satisfiedAt: complaint.satisfiedAt || null,
+    satisfactionNote: complaint.satisfactionNote || null,
     residentId: complaint.residentId,
     residentName: resident?.user.name || "",
     residentPhone: resident?.user.phone || "",
@@ -442,6 +444,96 @@ export const getComplaintHistory = async (complaintId, user) => {
 };
 
 /**
+ * Resident records satisfaction with a resolved/closed complaint. Idempotent —
+ * recording twice returns the current complaint unchanged.
+ */
+export const markSatisfied = async (complaintId, user, { note } = {}) => {
+  const societyId = await getSocietyIdForUser(user.id);
+  if (!societyId) return { forbidden: true };
+
+  const complaint = await prisma.complaint.findFirst({
+    where: { id: complaintId, societyId },
+    select: {
+      id: true,
+      title: true,
+      residentId: true,
+      status: true,
+      societyId: true,
+      satisfiedAt: true,
+    },
+  });
+
+  if (!complaint) return { notFound: true };
+
+  if (user.role === "RESIDENT") {
+    const resident = await prisma.resident.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
+    if (!resident || complaint.residentId !== resident.id) return { notFound: true };
+  }
+
+  if (!["RESOLVED", "CLOSED"].includes(complaint.status)) {
+    return {
+      invalidTransition: true,
+      message: `Satisfaction can only be recorded after the complaint is resolved (current: ${complaint.status})`,
+    };
+  }
+
+  if (complaint.satisfiedAt) {
+    const existing = await prisma.complaint.findUnique({
+      where: { id: complaintId },
+      include: COMPLAINT_INCLUDE,
+    });
+    return mapComplaint(existing);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.complaint.update({
+      where: { id: complaintId },
+      data: {
+        satisfiedAt: new Date(),
+        satisfactionNote: note || null,
+      },
+    });
+
+    await tx.complaintStatusHistory.create({
+      data: {
+        complaintId,
+        status: complaint.status,
+        changedById: user.id,
+        note: note || "Resident confirmed they are satisfied with the resolution",
+      },
+    });
+  });
+
+  const full = await prisma.complaint.findUnique({
+    where: { id: complaintId },
+    include: COMPLAINT_INCLUDE,
+  });
+
+  // Notify the society admin that the resident is satisfied, so the complaint
+  // can be closed. Best-effort side effect — a failure must never fail the
+  // satisfaction recording itself.
+  try {
+    const adminId = await getSocietyAdminId(complaint.societyId);
+    if (adminId) {
+      await createNotification({
+        userId: adminId,
+        type: "COMPLAINT_SATISFIED",
+        title: "Resident satisfied",
+        message: `The resident is satisfied with "${full.title}" — it is ready to be closed`,
+        complaintId,
+      });
+    }
+  } catch (error) {
+    console.error("Failed to create satisfaction notification:", error);
+  }
+
+  return mapComplaint(full);
+};
+
+/**
  * Resident reopens a resolved/closed complaint.
  */
 export const reopenComplaint = async (complaintId, user, { note } = {}) => {
@@ -505,6 +597,40 @@ export const reopenComplaint = async (complaintId, user, { note } = {}) => {
         complaintId,
       });
     }
+
+    // Notify the staff/vendor currently assigned to the complaint so they can
+    // follow up. Best-effort side effect, same as the admin notification.
+    const [vendorAssignees, staffAssignees] = await Promise.all([
+      prisma.vendorAssignment.findMany({
+        where: {
+          complaintId,
+          status: { in: ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"] },
+        },
+        select: { vendor: { select: { userId: true } } },
+      }),
+      prisma.staffAssignment.findMany({
+        where: {
+          complaintId,
+          status: { in: ["ASSIGNED", "ACCEPTED", "IN_PROGRESS"] },
+        },
+        select: { staff: { select: { userId: true } } },
+      }),
+    ]);
+
+    const assigneeIds = [
+      ...vendorAssignees.map((a) => a.vendor.userId),
+      ...staffAssignees.map((a) => a.staff.userId),
+    ];
+
+    for (const userId of assigneeIds) {
+      await createNotification({
+        userId,
+        type: "COMPLAINT_REOPENED",
+        title: "Complaint reopened",
+        message: `Complaint "${full.title}" was reopened by the resident — please follow up`,
+        complaintId,
+      });
+    }
   } catch (error) {
     console.error("Failed to create complaint reopened notification:", error);
   }
@@ -526,10 +652,23 @@ export const changeComplaintStatus = async (
 
   const complaint = await prisma.complaint.findFirst({
     where: { id: complaintId, societyId },
-    select: { id: true, status: true, residentId: true },
+    select: { id: true, status: true, residentId: true, satisfiedAt: true },
   });
 
   if (!complaint) return { notFound: true };
+
+  // A resolved complaint may only be closed once the resident has confirmed
+  // they are satisfied with the resolution.
+  if (
+    newStatus === "CLOSED" &&
+    complaint.status === "RESOLVED" &&
+    !complaint.satisfiedAt
+  ) {
+    return {
+      invalidTransition: true,
+      message: "Cannot close a resolved complaint until the resident confirms satisfaction",
+    };
+  }
 
   const result = await prisma.$transaction(async (tx) => {
     const r = await recordStatusChange(tx, complaintId, newStatus, adminUserId, note);

@@ -13,6 +13,7 @@ import {
   getComplaintHistoryHandler,
   reopenComplaintHandler,
   changeComplaintStatusHandler,
+  markSatisfiedHandler,
 } from "./complaint.controller.js";
 import {
   assignVendorHandler,
@@ -92,6 +93,13 @@ router.post(
   requireAuth,
   requireRole("RESIDENT"),
   reopenComplaintHandler,
+);
+
+router.post(
+  "/:id/satisfaction",
+  requireAuth,
+  requireRole("RESIDENT"),
+  markSatisfiedHandler,
 );
 
 router.patch(

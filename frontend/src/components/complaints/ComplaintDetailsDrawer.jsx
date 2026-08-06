@@ -26,8 +26,13 @@ import BeforeAfterImages from './BeforeAfterImages.jsx';
 import ReopenComplaintModal from './ReopenComplaintModal.jsx';
 import AssignComplaintModal from './AssignComplaintModal.jsx';
 import ResolveComplaintModal from './ResolveComplaintModal.jsx';
+import SatisfactionModal from './SatisfactionModal.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { reopenComplaint, changeComplaintStatus } from '../../lib/complaintApi.js';
+import {
+  reopenComplaint,
+  changeComplaintStatus,
+  markSatisfied,
+} from '../../lib/complaintApi.js';
 
 export default function ComplaintDetailsDrawer({
   isOpen,
@@ -51,11 +56,11 @@ export default function ComplaintDetailsDrawer({
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [satisfactionModalOpen, setSatisfactionModalOpen] = useState(false);
 
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
-  const [isSatisfied, setIsSatisfied] = useState(false);
 
   if (!isOpen || !complaint) return null;
 
@@ -108,7 +113,6 @@ export default function ComplaintDetailsDrawer({
   const canStartWork = isStaffOrVendor && currentStatus === 'ACCEPTED';
   const canResolve = isStaffOrVendor && currentStatus === 'IN_PROGRESS';
 
-  const canClose = isAdmin && currentStatus === 'RESOLVED';
   const canReopen = isResident && (currentStatus === 'RESOLVED' || currentStatus === 'CLOSED');
 
   // ── Action Handlers ────────────────────────────────────────────────────────
@@ -141,6 +145,31 @@ export default function ComplaintDetailsDrawer({
       setActionSuccess('Complaint reopened successfully.');
       complaint.status = 'REOPENED';
       setReopenModalOpen(false);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleReopenFromSatisfaction = () => {
+    setSatisfactionModalOpen(false);
+    setReopenModalOpen(true);
+  };
+
+  const handleSatisfiedSubmit = async (note) => {
+    setActionError('');
+    setActionSuccess('');
+    setIsActionLoading(true);
+    try {
+      const response = await markSatisfied(complaint.id, { note });
+      complaint.satisfiedAt = response.data?.satisfiedAt || new Date().toISOString();
+      complaint.satisfactionNote = note || null;
+      setSatisfactionModalOpen(false);
+      setActionSuccess('Satisfaction recorded. The Society Admin can now close the complaint.');
+      if (onStatusUpdated) onStatusUpdated();
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.message || 'Could not record satisfaction. Please try again.'
+      );
     } finally {
       setIsActionLoading(false);
     }
@@ -413,32 +442,36 @@ export default function ComplaintDetailsDrawer({
 
             {/* Contextual Action Bar (Role + Status Driven) */}
             <div className="p-4 border-t border-slate-200 bg-slate-50/70 space-y-3">
-              {/* Resident Satisfaction Check Prompt (When CLOSED) */}
-              {isResident && currentStatus === 'CLOSED' && (
+              {/* Resident Satisfaction Check Prompt */}
+              {isResident && (currentStatus === 'RESOLVED' || currentStatus === 'CLOSED') && (
                 <div className="p-3.5 bg-slate-900 text-white rounded-xl shadow-md space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                      Are you satisfied with this resolution?
+                      {complaint.satisfiedAt
+                        ? 'Satisfaction recorded'
+                        : 'Are you satisfied with this resolution?'}
                     </p>
-                    {isSatisfied && (
+                    {complaint.satisfiedAt && (
                       <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
-                        Marked Satisfied
+                        Marked Satisfied {formatDateTime(complaint.satisfiedAt)}
                       </span>
                     )}
                   </div>
-                  {!isSatisfied && (
+                  {!complaint.satisfiedAt && (
                     <div className="flex items-center gap-2 pt-1">
                       <button
-                        onClick={() => setIsSatisfied(true)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                        onClick={() => setSatisfactionModalOpen(true)}
+                        disabled={isActionLoading}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <ThumbsUp className="w-3.5 h-3.5" />
-                        <span>Yes, Issue Resolved</span>
+                        <span>Confirm Resolution</span>
                       </button>
                       <button
-                        onClick={() => setReopenModalOpen(true)}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                        onClick={handleReopenFromSatisfaction}
+                        disabled={isActionLoading}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <RotateCcw className="w-3.5 h-3.5" />
                         <span>No, Reopen Complaint</span>
@@ -501,26 +534,33 @@ export default function ComplaintDetailsDrawer({
                     </button>
                   )}
 
-                  {/* Admin: Close Complaint */}
-                  {canClose && (
-                    <button
-                      onClick={handleCloseComplaint}
-                      disabled={isActionLoading}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      {isActionLoading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Lock className="w-4 h-4" />
-                      )}
-                      <span>Close Complaint</span>
-                    </button>
+                  {/* Admin: Close Complaint (after resident confirms satisfaction) */}
+                  {isAdmin && currentStatus === 'RESOLVED' && (
+                    complaint.satisfiedAt ? (
+                      <button
+                        onClick={handleCloseComplaint}
+                        disabled={isActionLoading}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {isActionLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Lock className="w-4 h-4" />
+                        )}
+                        <span>Close Complaint</span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-500 bg-slate-100 rounded-lg border border-dashed border-slate-300">
+                        <ThumbsUp className="w-4 h-4" />
+                        Awaiting resident confirmation
+                      </span>
+                    )
                   )}
 
                   {/* Resident: Reopen Button */}
                   {canReopen && currentStatus === 'RESOLVED' && (
                     <button
-                      onClick={() => setReopenModalOpen(true)}
+                      onClick={() => setSatisfactionModalOpen(true)}
                       disabled={isActionLoading}
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                     >
@@ -560,6 +600,16 @@ export default function ComplaintDetailsDrawer({
         onClose={() => setResolveModalOpen(false)}
         complaint={complaint}
         onResolve={handleResolveSubmit}
+      />
+
+      <SatisfactionModal
+        isOpen={satisfactionModalOpen}
+        onClose={() => setSatisfactionModalOpen(false)}
+        complaint={complaint}
+        onSatisfied={handleSatisfiedSubmit}
+        onReopen={handleReopenFromSatisfaction}
+        isSubmitting={isActionLoading}
+        error={actionError}
       />
     </>
   );
