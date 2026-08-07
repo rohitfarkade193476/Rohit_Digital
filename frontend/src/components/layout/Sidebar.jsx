@@ -16,6 +16,7 @@ import {
   ClipboardList,
   CreditCard,
   X,
+  Link2,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
 
@@ -45,6 +46,11 @@ const ROLE_MENUS = {
     { label: "Staff", path: "/society-admin/staff", icon: UserCog },
     { label: "Vendors", path: "/society-admin/vendors", icon: Briefcase },
     {
+      label: "Connections",
+      path: "/society-admin/vendor-connections",
+      icon: Link2,
+    },
+    {
       label: "Complaints",
       path: "/society-admin/complaints",
       icon: AlertCircle,
@@ -72,6 +78,7 @@ const ROLE_MENUS = {
   VENDOR: [
     { label: "Dashboard", path: "/vendor/dashboard", icon: LayoutDashboard },
     { label: "Assignments", path: "/vendor/assignments", icon: Briefcase },
+    { label: "Connections", path: "/vendor/connections", icon: Link2 },
     { label: "Profile", path: "/vendor/profile", icon: User },
   ],
 };

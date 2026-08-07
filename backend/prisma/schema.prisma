@@ -64,6 +64,13 @@ enum AssignmentStatus {
   CANCELLED
 }
 
+enum VendorConnectionStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REMOVED
+}
+
 // ─────────────────────────────────────────────
 // MODELS
 // ─────────────────────────────────────────────
@@ -93,6 +100,7 @@ model Society {
   staff             Staff[]
   complaints        Complaint[]
   vendorAssignments VendorAssignment[]
+  vendorConnections VendorConnection[]
   staffAssignments  StaffAssignment[]
 
   @@index([societyCode])
@@ -125,6 +133,7 @@ model User {
   accounts            Account[]
   assignedAssignments VendorAssignment[]       @relation("AssignmentAssignedBy")
   assignedStaffAssignments StaffAssignment[]   @relation("StaffAssignmentAssignedBy")
+  requestedVendorConnections VendorConnection[] @relation("VendorConnectionRequestedBy")
   statusChanges       ComplaintStatusHistory[]
   notifications       Notification[]
   pushSubscriptions   PushSubscription[]
@@ -207,10 +216,32 @@ model Vendor {
 
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   assignments VendorAssignment[]
+  connections VendorConnection[]
 
   @@index([userId])
   @@index([category])
   @@index([isAvailable])
+}
+
+model VendorConnection {
+  id          String                 @id @default(cuid())
+  vendorId    String
+  societyId   String
+  status      VendorConnectionStatus @default(PENDING)
+  requestedBy String?
+  requestedAt DateTime               @default(now())
+  respondedAt DateTime?
+  removedAt   DateTime?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  society         Society  @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  requestedByUser User?    @relation("VendorConnectionRequestedBy", fields: [requestedBy], references: [id], onDelete: SetNull)
+
+  @@index([vendorId])
+  @@index([societyId])
+  @@index([status])
 }
 
 model Complaint {

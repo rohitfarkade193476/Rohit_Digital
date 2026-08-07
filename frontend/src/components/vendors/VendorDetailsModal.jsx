@@ -11,8 +11,93 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import { formatDate } from '../../lib/format.js';
+
+function ConnectionCard({
+  connectionStatus,
+  isSendingRequest,
+  onSendRequest,
+  vendor,
+}) {
+  const status = connectionStatus;
+
+  const StatusBadge = ({ className, icon: Icon, children }) => (
+    <span
+      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${className}`}
+    >
+      <Icon className="w-3.5 h-3.5" />
+      {children}
+    </span>
+  );
+
+  const canRequest =
+    status === null || status === 'REJECTED' || status === 'REMOVED';
+
+  return (
+    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+          Connection Status
+        </p>
+
+        {status === 'ACCEPTED' ? (
+          <StatusBadge
+            className="bg-emerald-50 text-emerald-700 border-emerald-200"
+            icon={CheckCircle2}
+          >
+            Connected
+          </StatusBadge>
+        ) : status === 'PENDING' ? (
+          <StatusBadge
+            className="bg-amber-50 text-amber-700 border-amber-200"
+            icon={Clock}
+          >
+            Request Pending
+          </StatusBadge>
+        ) : status === 'REJECTED' ? (
+          <StatusBadge
+            className="bg-red-50 text-red-700 border-red-200"
+            icon={XCircle}
+          >
+            Request Rejected
+          </StatusBadge>
+        ) : status === 'REMOVED' ? (
+          <StatusBadge
+            className="bg-slate-100 text-slate-600 border-slate-200"
+            icon={XCircle}
+          >
+            Removed
+          </StatusBadge>
+        ) : (
+          <span className="text-xs text-slate-400 font-medium">Not connected</span>
+        )}
+      </div>
+
+      {canRequest && (
+        <button
+          onClick={() => onSendRequest(vendor.id)}
+          disabled={isSendingRequest}
+          className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {isSendingRequest ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Link2 className="w-4 h-4" />
+          )}
+          {isSendingRequest ? 'Sending request…' : 'Send Connection Request'}
+        </button>
+      )}
+
+      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+        An accepted connection lets this vendor receive work assignments from
+        your society.
+      </p>
+    </div>
+  );
+}
 
 function Row({ icon: Icon, label, value }) {
   return (
@@ -30,7 +115,14 @@ function Row({ icon: Icon, label, value }) {
   );
 }
 
-export default function VendorDetailsModal({ isOpen, onClose, vendor }) {
+export default function VendorDetailsModal({
+  isOpen,
+  onClose,
+  vendor,
+  connectionStatus = null,
+  isSendingRequest = false,
+  onSendRequest = () => {},
+}) {
   if (!isOpen || !vendor) return null;
 
   const address = [vendor.address, vendor.city, vendor.state, vendor.pincode]
@@ -111,6 +203,13 @@ export default function VendorDetailsModal({ isOpen, onClose, vendor }) {
           </div>
 
           <Row icon={MapPin} label="Address" value={address} />
+
+          <ConnectionCard
+            connectionStatus={connectionStatus}
+            isSendingRequest={isSendingRequest}
+            onSendRequest={onSendRequest}
+            vendor={vendor}
+          />
 
           <div className="rounded-xl bg-slate-50 border border-slate-200 p-4">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
