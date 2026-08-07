@@ -24,8 +24,24 @@ const CONFIG = {
   },
 };
 
+const NOT_CONNECTED_CONFIG = {
+  className: 'bg-slate-100 text-slate-500 border-slate-200',
+  icon: Unplug,
+  label: 'Not Connected',
+};
+
 export default function ConnectionStatusBadge({ status }) {
-  const config = CONFIG[status] || CONFIG.PENDING;
+  const config = status ? CONFIG[status] : NOT_CONNECTED_CONFIG;
+  if (!config) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border ${NOT_CONNECTED_CONFIG.className}`}
+      >
+        <Unplug className="w-3.5 h-3.5" />
+        {NOT_CONNECTED_CONFIG.label}
+      </span>
+    );
+  }
   const Icon = config.icon;
   return (
     <span

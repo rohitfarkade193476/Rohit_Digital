@@ -240,6 +240,7 @@ export default function VendorManagement() {
           total={total}
           onPageChange={setCurrentPage}
           onView={(vendor) => setDetailsVendor(vendor)}
+          connectionStatusForVendor={connectionStatusForVendor}
         />
       )}
 

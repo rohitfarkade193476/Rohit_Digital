@@ -17,6 +17,7 @@ export default function AssignComplaintModal({
   complaint,
   staffList = [],
   vendorList = [],
+  unconnectedVendorCount = 0,
   isLoadingStaff = false,
   isLoadingVendors = false,
   onAssign,
@@ -198,6 +199,11 @@ export default function AssignComplaintModal({
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
                 {assigneeType === 'STAFF' ? 'Select Staff Member *' : 'Select Vendor Partner *'}
               </label>
+              {assigneeType === 'VENDOR' && (
+                <p className="text-[11px] text-slate-400 mb-1.5">
+                  Only vendors connected to your society can be assigned.
+                </p>
+              )}
 
               {assigneeType === 'STAFF' ? (
                 isLoadingStaff ? (
@@ -247,9 +253,27 @@ export default function AssignComplaintModal({
                   <Loader2 className="w-4 h-4 animate-spin mr-2" /> Loading vendors...
                 </div>
               ) : filteredVendors.length === 0 ? (
-                <p className="text-xs text-slate-400 italic py-4 text-center">
-                  No matching vendors found.
-                </p>
+                <div className="text-center py-4">
+                  <Building2 className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+                  {vendorList.length === 0 ? (
+                    <>
+                      <p className="text-xs text-slate-500 font-medium">
+                        No connected vendors available.
+                      </p>
+                      {unconnectedVendorCount > 0 && (
+                        <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                          {unconnectedVendorCount} vendor(s) exist but are not
+                          connected to your society. Send a connection request
+                          from the Vendors page first.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-slate-400 italic">
+                      No matching vendors found.
+                    </p>
+                  )}
+                </div>
               ) : (
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
                   {filteredVendors.map((vendor) => (

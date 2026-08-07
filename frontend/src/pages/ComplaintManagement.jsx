@@ -15,6 +15,7 @@ import {
 } from '../lib/assignmentApi.js';
 import { getAllVendors } from '../lib/vendorApi.js';
 import { getAllStaff } from '../lib/staffApi.js';
+import { getSocietyConnections } from '../lib/vendorConnectionApi.js';
 
 const PAGE_SIZE = 10;
 
@@ -43,6 +44,7 @@ export default function ComplaintManagement() {
 
   const [assignVendorModalOpen, setAssignVendorModalOpen] = useState(false);
   const [vendors, setVendors] = useState([]);
+  const [connectedVendorIds, setConnectedVendorIds] = useState(() => new Set());
   const [isLoadingVendors, setIsLoadingVendors] = useState(false);
   const [staff, setStaff] = useState([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
@@ -110,14 +112,25 @@ export default function ComplaintManagement() {
     };
   }, [deepLinkComplaintId]);
 
-  // Load assignable vendors once (for the Assign Vendor modal)
+  // Load assignable vendors once (for the Assign Vendor modal). Only vendors
+  // with an ACCEPTED connection to this society may be assigned work.
   const fetchVendors = useCallback(async () => {
     try {
       setIsLoadingVendors(true);
-      const data = await getAllVendors({ page: 1, limit: 100 });
-      setVendors(data.data?.vendors || []);
+      const [vendorsData, connectionsData] = await Promise.all([
+        getAllVendors({ page: 1, limit: 100 }),
+        getSocietyConnections().catch(() => ({ data: { connections: [] } })),
+      ]);
+      setVendors(vendorsData.data?.vendors || []);
+      const acceptedIds = new Set(
+        (connectionsData.data?.connections || [])
+          .filter((c) => c.status === 'ACCEPTED')
+          .map((c) => c.vendorId),
+      );
+      setConnectedVendorIds(acceptedIds);
     } catch (err) {
       setVendors([]);
+      setConnectedVendorIds(new Set());
     } finally {
       setIsLoadingVendors(false);
     }
@@ -126,6 +139,13 @@ export default function ComplaintManagement() {
   useEffect(() => {
     fetchVendors();
   }, [fetchVendors]);
+
+  const connectedVendors = useMemo(
+    () => vendors.filter((v) => connectedVendorIds.has(v.id)),
+    [vendors, connectedVendorIds],
+  );
+
+  const unconnectedVendorCount = vendors.length - connectedVendors.length;
 
   // Load assignable staff once (for the Assign Staff tab)
   const fetchStaff = useCallback(async () => {
@@ -351,7 +371,8 @@ export default function ComplaintManagement() {
         onAssign={handleAssign}
         onStatusUpdated={handleStatusUpdated}
         staffList={staff}
-        vendorList={vendors}
+        vendorList={connectedVendors}
+        unconnectedVendorCount={unconnectedVendorCount}
         isLoadingStaff={isLoadingStaff}
         isLoadingVendors={isLoadingVendors}
       />
@@ -361,7 +382,8 @@ export default function ComplaintManagement() {
         onClose={() => setAssignVendorModalOpen(false)}
         complaint={selectedComplaint}
         staffList={staff}
-        vendorList={vendors}
+        vendorList={connectedVendors}
+        unconnectedVendorCount={unconnectedVendorCount}
         isLoadingStaff={isLoadingStaff}
         isLoadingVendors={isLoadingVendors}
         onAssign={handleAssign}

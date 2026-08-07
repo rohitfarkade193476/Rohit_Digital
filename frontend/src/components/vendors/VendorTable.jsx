@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Building2,
 } from 'lucide-react';
+import ConnectionStatusBadge from '../vendor/ConnectionStatusBadge.jsx';
 
 function StatusBadge({ status }) {
   if (status === 'ACTIVE') {
@@ -56,6 +57,7 @@ export default function VendorTable({
   total = 0,
   onPageChange,
   onView,
+  connectionStatusForVendor,
 }) {
   const pageSize = vendorList.length || 1;
   const from = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -73,6 +75,7 @@ export default function VendorTable({
               <th className="px-6 py-3.5">Contact Details</th>
               <th className="px-6 py-3.5">Status</th>
               <th className="px-6 py-3.5">Availability</th>
+              <th className="px-6 py-3.5">Connection</th>
               <th className="px-6 py-3.5 text-right">Actions</th>
             </tr>
           </thead>
@@ -134,6 +137,17 @@ export default function VendorTable({
                     <AvailabilityBadge isAvailable={vendor.isAvailable} />
                   </td>
 
+                  {/* Connection */}
+                  <td className="px-6 py-4">
+                    <ConnectionStatusBadge
+                      status={
+                        connectionStatusForVendor
+                          ? connectionStatusForVendor(vendor.id)
+                          : null
+                      }
+                    />
+                  </td>
+
                   {/* Actions */}
                   <td className="px-6 py-4 text-right">
                     <button
@@ -149,7 +163,7 @@ export default function VendorTable({
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-slate-400">
+                <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
                   {searchTerm
                     ? 'No vendors matching your search filter.'
                     : 'No vendors found.'}
