@@ -16,6 +16,7 @@ import staffRoutes from "./modules/staff/staff.routes.js";
 import vendorRoutes from "./modules/vendor/vendor.routes.js";
 import complaintRoutes from "./modules/complaints/complaint.routes.js";
 import vendorAssignmentRoutes from "./modules/complaints/vendor-assignment.routes.js";
+import staffAssignmentRoutes from "./modules/complaints/staff-assignment.routes.js";
 import notificationRoutes from "./modules/notifications/notification.routes.js";
 
 import errorHandler from "./middlewares/error.middleware.js";
@@ -62,6 +63,11 @@ app.use("/api/flats", flatRoutes);
 
 
 app.use("/api/residents", residentRoutes);
+// The staff assignment self-service router must be mounted before the staff
+// CRUD router: staffRoutes has a GET /:id that would otherwise capture
+// /api/staff/assignments as an "id" and reject STAFF (it requires SOCIETY_ADMIN).
+// Vendor is unaffected because it lives on a different base path (/api/vendors).
+app.use("/api/staff/assignments", staffAssignmentRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/complaints", complaintRoutes);

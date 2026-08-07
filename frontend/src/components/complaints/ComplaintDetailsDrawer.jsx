@@ -33,6 +33,7 @@ import {
   changeComplaintStatus,
   markSatisfied,
 } from '../../lib/complaintApi.js';
+import { updateMyStaffAssignmentStatus } from '../../lib/staffApi.js';
 
 export default function ComplaintDetailsDrawer({
   isOpen,
@@ -103,6 +104,7 @@ export default function ComplaintDetailsDrawer({
   // ── Role & Status Action Permissions ─────────────────────────────────────
   const isAdmin = role === 'SOCIETY_ADMIN' || role === 'SUPER_ADMIN';
   const isStaffOrVendor = role === 'STAFF' || role === 'VENDOR';
+  const isStaff = role === 'STAFF';
   const isResident = role === 'RESIDENT';
 
   const canAssign =
@@ -187,7 +189,59 @@ export default function ComplaintDetailsDrawer({
     }
   };
 
+  // Staff actions persist to the backend (source of truth) using the staff
+  // assignment API. The drawer is only ever opened with these action buttons
+  // active by the Staff role, so this path does not affect admin/resident use.
+  const handleStaffStatusAction = async (status) => {
+    setActionError('');
+    setActionSuccess('');
+    setIsActionLoading(true);
+    try {
+      await updateMyStaffAssignmentStatus(complaint.assignmentId, status, null);
+      setActionSuccess(
+        status === 'ACCEPTED'
+          ? 'Assignment accepted successfully.'
+          : 'Work started successfully.',
+      );
+      if (onStatusUpdated) onStatusUpdated();
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.message || 'Could not update assignment status.',
+      );
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleStaffResolve = async (complaintId, resolutionData) => {
+    setActionError('');
+    setActionSuccess('');
+    setIsActionLoading(true);
+    try {
+      await updateMyStaffAssignmentStatus(
+        complaint.assignmentId,
+        'COMPLETED',
+        resolutionData.imageFile,
+      );
+      setResolveModalOpen(false);
+      setActionSuccess('Complaint resolved with evidence uploaded successfully.');
+      if (onStatusUpdated) onStatusUpdated();
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.message || 'Could not complete the assignment.',
+      );
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleResolveSubmit = (complaintId, resolutionData) => {
+    // Staff resolves through the backend assignment API (persists RESOLVED +
+    // afterImageUrl on the complaint). Other roles keep the existing fallback.
+    if (isStaff && complaint.assignmentId) {
+      handleStaffResolve(complaintId, resolutionData);
+      return;
+    }
     setResolveModalOpen(false);
     setActionSuccess('Complaint resolved with evidence uploaded successfully.');
     if (onResolve) {
@@ -499,13 +553,22 @@ export default function ComplaintDetailsDrawer({
                   {canAccept && (
                     <button
                       onClick={() => {
-                        complaint.status = 'ACCEPTED';
-                        setActionSuccess('Job accepted successfully.');
-                        if (onStatusUpdated) onStatusUpdated();
+                        if (isStaff && complaint.assignmentId) {
+                          handleStaffStatusAction('ACCEPTED');
+                        } else {
+                          complaint.status = 'ACCEPTED';
+                          setActionSuccess('Job accepted successfully.');
+                          if (onStatusUpdated) onStatusUpdated();
+                        }
                       }}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                      disabled={isActionLoading}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                     >
-                      <Check className="w-4 h-4" />
+                      {isActionLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
                       <span>Accept Assignment</span>
                     </button>
                   )}
@@ -513,20 +576,32 @@ export default function ComplaintDetailsDrawer({
                   {canStartWork && (
                     <button
                       onClick={() => {
-                        complaint.status = 'IN_PROGRESS';
-                        setActionSuccess('Work started.');
-                        if (onStatusUpdated) onStatusUpdated();
+                        if (isStaff && complaint.assignmentId) {
+                          handleStaffStatusAction('IN_PROGRESS');
+                        } else {
+                          complaint.status = 'IN_PROGRESS';
+                          setActionSuccess('Work started.');
+                          if (onStatusUpdated) onStatusUpdated();
+                        }
                       }}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
+                      disabled={isActionLoading}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
                     >
-                      <Wrench className="w-4 h-4" />
+                      {isActionLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Wrench className="w-4 h-4" />
+                      )}
                       <span>Start Work</span>
                     </button>
                   )}
 
                   {canResolve && (
                     <button
-                      onClick={() => setResolveModalOpen(true)}
+                      onClick={() => {
+                        setActionError('');
+                        setResolveModalOpen(true);
+                      }}
                       className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer"
                     >
                       <CheckCircle2 className="w-4 h-4" />
@@ -600,6 +675,8 @@ export default function ComplaintDetailsDrawer({
         onClose={() => setResolveModalOpen(false)}
         complaint={complaint}
         onResolve={handleResolveSubmit}
+        isSubmitting={isActionLoading}
+        error={actionError}
       />
 
       <SatisfactionModal

@@ -62,3 +62,48 @@ export async function importStaffExcel(file) {
   return response.data;
 }
 
+// ── Staff Assignment Self-Service ─────────────────────────────────────────────
+
+/**
+ * Fetch all assignments belonging to the authenticated staff member.
+ * @returns {Promise<{ success: boolean, message: string, data: object[] }>}
+ */
+export async function getMyStaffAssignments() {
+  const response = await axiosInstance.get('/api/staff/assignments');
+  return response.data;
+}
+
+/**
+ * Fetch a single staff assignment by id (must belong to the authenticated user).
+ * @param {string} id
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function getMyStaffAssignmentById(id) {
+  const response = await axiosInstance.get(`/api/staff/assignments/${id}`);
+  return response.data;
+}
+
+/**
+ * Update the status of a staff assignment.
+ * For COMPLETED, afterImageFile (a File object) is required.
+ *
+ * @param {string} id - assignment id
+ * @param {string} status - ACCEPTED | IN_PROGRESS | COMPLETED | CANCELLED
+ * @param {File|null} afterImageFile - required when status === 'COMPLETED'
+ * @returns {Promise<{ success: boolean, message: string, data: object }>}
+ */
+export async function updateMyStaffAssignmentStatus(id, status, afterImageFile = null) {
+  const formData = new FormData();
+  formData.append('status', status);
+  if (afterImageFile) {
+    formData.append('afterImage', afterImageFile);
+  }
+
+  const response = await axiosInstance.patch(
+    `/api/staff/assignments/${id}/status`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return response.data;
+}
+
