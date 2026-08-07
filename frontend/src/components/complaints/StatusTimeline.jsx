@@ -11,7 +11,7 @@ import {
   Circle,
   UserCheck,
 } from 'lucide-react';
-import { COMPLAINT_STATUS_LABELS, formatDateTime } from '../../lib/format.js';
+import { COMPLAINT_STATUS_LABELS, formatDateTime, resolveImageUrl } from '../../lib/format.js';
 
 // Status icons configuration
 const STATUS_ICONS = {
@@ -87,6 +87,9 @@ export default function StatusTimeline({
     // Add all completed/recorded history entries in chronological order
     history.forEach((entry, index) => {
       const isLatest = index === history.length - 1;
+      // CLOSED is terminal: render the final Closed entry as a completed
+      // (ticked) step instead of an in-progress "current" step.
+      const isTerminal = entry.status === 'CLOSED';
       renderedSteps.push({
         key: entry.id || `history-${index}`,
         status: entry.status,
@@ -94,7 +97,8 @@ export default function StatusTimeline({
         timestamp: entry.createdAt,
         note: entry.note,
         changedBy: entry.changedBy,
-        state: isLatest ? 'CURRENT' : 'COMPLETED',
+        resolutionImageUrl: entry.resolutionImageUrl,
+        state: isLatest && !isTerminal ? 'CURRENT' : 'COMPLETED',
       });
     });
 
@@ -120,7 +124,7 @@ export default function StatusTimeline({
     STANDARD_FLOW.forEach((st, idx) => {
       let state = 'PENDING';
       if (idx < currentIndex) state = 'COMPLETED';
-      else if (idx === currentIndex) state = 'CURRENT';
+      else if (idx === currentIndex) state = st === 'CLOSED' ? 'COMPLETED' : 'CURRENT';
 
       renderedSteps.push({
         key: `default-${st}`,
@@ -218,7 +222,7 @@ export default function StatusTimeline({
                 </div>
 
                 {/* Subtext / Vendor / Note / Actor */}
-                {step.status === 'ASSIGNED' && assignedVendor && (
+                {step.status === 'ASSIGNED' && assignedVendor?.companyName && (
                   <div className="mt-1 flex items-center gap-1.5 text-xs text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-100 w-fit">
                     <UserCheck className="w-3.5 h-3.5 shrink-0" />
                     <span>
@@ -246,6 +250,14 @@ export default function StatusTimeline({
                       {step.changedBy.role}
                     </span>
                   </p>
+                )}
+
+                {step.status === 'RESOLVED' && step.resolutionImageUrl && (
+                  <img
+                    src={resolveImageUrl(step.resolutionImageUrl)}
+                    alt="Resolution evidence"
+                    className="mt-2 h-24 w-36 rounded-lg object-cover border border-slate-200"
+                  />
                 )}
 
                 {isPending && !step.note && (

@@ -1,15 +1,4 @@
 
-// Role-based routes used by notification navigation. Kept in one place so the
-// header dropdown and the Notifications page deep-link to the same destinations.
-
-export const NOTIFICATION_ROUTES_BY_ROLE = {
-  SUPER_ADMIN: '/super-admin/notifications',
-  SOCIETY_ADMIN: '/society-admin/notifications',
-  STAFF: '/staff/notifications',
-  RESIDENT: '/resident/notifications',
-  VENDOR: '/vendor/notifications',
-};
-
 // Landing route that shows a role's complaint/work list. Complaint detail is
 // opened through each page's existing UI mechanism (drawer / detail route),
 // driven by the `complaint` query parameter.

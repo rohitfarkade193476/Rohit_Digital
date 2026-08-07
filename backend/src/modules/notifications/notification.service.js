@@ -29,20 +29,29 @@ export const createNotification = async ({
 
 export const listUserNotifications = async (
   userId,
-  { page = 1, limit = 20 } = {}
+  { page = 1, limit = 20, read } = {}
 ) => {
   const pageNum = Math.max(1, Number(page) || 1);
   const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
   const skip = (pageNum - 1) * limitNum;
 
+  const where = { userId };
+  if (read === "true" || read === true) {
+    where.isRead = true;
+  } else if (read === "false" || read === false) {
+    where.isRead = false;
+  }
+
   const [notifications, total, unread] = await Promise.all([
     prisma.notification.findMany({
-      where: { userId },
+      where,
       orderBy: { createdAt: "desc" },
       skip,
       take: limitNum,
     }),
-    prisma.notification.count({ where: { userId } }),
+    prisma.notification.count({ where }),
+    // `unread` is always the user's global unread count so the header badge
+    // stays correct regardless of the current read/unread filter.
     prisma.notification.count({ where: { userId, isRead: false } }),
   ]);
 

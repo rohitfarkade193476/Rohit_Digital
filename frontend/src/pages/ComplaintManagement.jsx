@@ -189,6 +189,21 @@ export default function ComplaintManagement() {
     setAssignVendorModalOpen(true);
   };
 
+  // Refresh the list AND the complaint currently shown in the drawer, so the
+  // drawer reflects the real status from the backend after an action (e.g.
+  // closing a complaint) instead of going stale.
+  const handleStatusUpdated = useCallback(async () => {
+    await fetchComplaints();
+    if (selectedComplaint?.id) {
+      try {
+        const fresh = await getComplaintById(selectedComplaint.id);
+        if (fresh?.data) setSelectedComplaint(fresh.data);
+      } catch (e) {
+        // Keep the current drawer data if the refresh fails.
+      }
+    }
+  }, [fetchComplaints, selectedComplaint]);
+
   const handleAssign = async (complaintId, payload) => {
     if (!payload || isAssigning) return;
     const assigneeId = typeof payload === 'string' ? payload : payload.id;
@@ -210,6 +225,12 @@ export default function ComplaintManagement() {
       if (selectedComplaint && selectedComplaint.id === complaintId) {
         const data = await getComplaintAssignments(complaintId);
         setAssignments(data.data || []);
+        try {
+          const fresh = await getComplaintById(complaintId);
+          if (fresh?.data) setSelectedComplaint(fresh.data);
+        } catch (e) {
+          // Keep the current drawer data if the refresh fails.
+        }
       }
     } catch (err) {
       setAssignError(
@@ -328,7 +349,7 @@ export default function ComplaintManagement() {
         assignmentError={assignmentError}
         onAssignVendorClick={handleOpenAssignVendor}
         onAssign={handleAssign}
-        onStatusUpdated={fetchComplaints}
+        onStatusUpdated={handleStatusUpdated}
         staffList={staff}
         vendorList={vendors}
         isLoadingStaff={isLoadingStaff}

@@ -24,8 +24,8 @@ export function NotificationProvider({ children }) {
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
 
   /**
-   * Fetch the latest notifications for the Header dropdown.
-   * Header only needs the most recent 5.
+   * Fetch the latest unread notifications for the Header dropdown.
+   * Read notifications stay in the database but are excluded from the popup.
    */
   const fetchRecentNotifications = useCallback(async () => {
     if (!user) {
@@ -39,7 +39,8 @@ export function NotificationProvider({ children }) {
 
       const data = await getNotifications({
         page: 1,
-        limit: 5,
+        limit: 100,
+        read: false,
       });
 
       setRecentNotifications(data.data?.notifications || []);
@@ -88,16 +89,13 @@ export function NotificationProvider({ children }) {
   }, [fetchRecentNotifications]);
   /**
    * Mark one notification as read.
+   * The notification stays in the database but is removed from the popup list.
    */
   const markNotificationRead = useCallback(async (id) => {
     await apiMarkNotificationRead(id);
 
     setRecentNotifications((prev) =>
-      prev.map((notification) =>
-        notification.id === id
-          ? { ...notification, isRead: true }
-          : notification,
-      ),
+      prev.filter((notification) => notification.id !== id),
     );
 
     setUnreadCount((prev) => Math.max(0, prev - 1));
@@ -105,18 +103,14 @@ export function NotificationProvider({ children }) {
 
   /**
    * Mark all notifications as read.
+   * Notifications stay in the database but are removed from the popup list.
    */
   const markAllNotificationsRead = useCallback(async () => {
     if (unreadCount === 0) return;
 
     await apiMarkAllNotificationsRead();
 
-    setRecentNotifications((prev) =>
-      prev.map((notification) => ({
-        ...notification,
-        isRead: true,
-      })),
-    );
+    setRecentNotifications([]);
 
     setUnreadCount(0);
   }, [unreadCount]);
@@ -135,7 +129,7 @@ export function NotificationProvider({ children }) {
         return prev;
       }
 
-      return [notification, ...prev].slice(0, 5);
+      return [notification, ...prev].slice(0, 100);
     });
 
     if (!notification.isRead) {

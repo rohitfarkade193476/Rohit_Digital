@@ -53,6 +53,19 @@ const ASSIGNMENT_INCLUDE = {
           flat: { select: { flatNumber: true, wing: true } },
         },
       },
+      statusHistory: {
+        select: {
+          id: true,
+          status: true,
+          note: true,
+          resolutionImageUrl: true,
+          createdAt: true,
+          changedBy: {
+            select: { id: true, name: true, role: true },
+          },
+        },
+        orderBy: { createdAt: "asc" },
+      },
     },
   },
   assignedBy: {
@@ -103,6 +116,20 @@ const mapAssignment = (assignment) => ({
           wing: assignment.complaint.resident.flat?.wing || "",
         }
       : null,
+    statusHistory: (assignment.complaint.statusHistory || []).map((h) => ({
+      id: h.id,
+      status: h.status,
+      note: h.note || null,
+      resolutionImageUrl: h.resolutionImageUrl || null,
+      createdAt: h.createdAt,
+      changedBy: h.changedBy
+        ? {
+            id: h.changedBy.id,
+            name: h.changedBy.name,
+            role: h.changedBy.role,
+          }
+        : null,
+    })),
   },
   assignedBy: assignment.assignedBy
     ? { id: assignment.assignedBy.id, name: assignment.assignedBy.name }
@@ -165,14 +192,20 @@ export const assignVendorToComplaint = async (
     return { conflict: true, message: "This vendor is currently unavailable" };
   }
 
-  const active = await prisma.vendorAssignment.findFirst({
-    where: { complaintId, status: { in: ACTIVE_STATUSES } },
-    select: { id: true },
-  });
-  if (active) {
+  const [activeVendor, activeStaff] = await Promise.all([
+    prisma.vendorAssignment.findFirst({
+      where: { complaintId, status: { in: ACTIVE_STATUSES } },
+      select: { id: true },
+    }),
+    prisma.staffAssignment.findFirst({
+      where: { complaintId, status: { in: ACTIVE_STATUSES } },
+      select: { id: true },
+    }),
+  ]);
+  if (activeVendor || activeStaff) {
     return {
       conflict: true,
-      message: "Complaint already has an active vendor assignment",
+      message: "Complaint already has an active vendor or staff assignment",
     };
   }
 
@@ -331,6 +364,7 @@ export const updateVendorAssignmentStatus = async (
   // Pre-check complaint status transition before entering the transaction.
   if (
     status === "ACCEPTED" ||
+    status === "IN_PROGRESS" ||
     status === "COMPLETED" ||
     status === "CANCELLED"
   ) {
@@ -340,10 +374,12 @@ export const updateVendorAssignmentStatus = async (
     });
     const targetComplaintStatus =
       status === "ACCEPTED"
-        ? "IN_PROGRESS"
-        : status === "COMPLETED"
-          ? "RESOLVED"
-          : "OPEN";
+        ? "ACCEPTED"
+        : status === "IN_PROGRESS"
+          ? "IN_PROGRESS"
+          : status === "COMPLETED"
+            ? "RESOLVED"
+            : "OPEN";
 
     if (
       !VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes(
@@ -374,9 +410,17 @@ export const updateVendorAssignmentStatus = async (
       complaintStatusResult = await recordStatusChange(
         tx,
         assignment.complaintId,
-        "IN_PROGRESS",
+        "ACCEPTED",
         userId,
         "Vendor accepted the assignment",
+      );
+    } else if (status === "IN_PROGRESS") {
+      complaintStatusResult = await recordStatusChange(
+        tx,
+        assignment.complaintId,
+        "IN_PROGRESS",
+        userId,
+        "Vendor started work on the complaint",
       );
     } else if (status === "COMPLETED") {
       complaintStatusResult = await recordStatusChange(
