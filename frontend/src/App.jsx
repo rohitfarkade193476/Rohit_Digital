@@ -22,6 +22,7 @@ import ResidentManagement from "./pages/ResidentManagement.jsx";
 import ComplaintManagement from "./pages/ComplaintManagement.jsx";
 import StaffManagement from "./pages/StaffManagement.jsx";
 import VendorManagement from "./pages/VendorManagement.jsx";
+import SocietyVendorConnections from "./pages/VendorConnections.jsx";
 import MaintenanceManagement from "./pages/MaintenanceManagement.jsx";
 
 // Resident Pages
@@ -38,6 +39,7 @@ import StaffAssignedComplaints from "./pages/staff/StaffAssignedComplaints.jsx";
 import VendorDashboard from "./components/dashboards/VendorDashboard.jsx";
 import VendorAssignments from "./pages/vendor/VendorAssignments.jsx";
 import VendorAssignmentDetail from "./pages/vendor/VendorAssignmentDetail.jsx";
+import VendorConnections from "./pages/vendor/VendorConnections.jsx";
 import VendorProfile from "./pages/vendor/VendorProfile.jsx";
 
 export default function App() {
@@ -64,6 +66,7 @@ export default function App() {
           <Route path="residents" element={<ResidentManagement />} />
           <Route path="staff" element={<StaffManagement />} />
           <Route path="vendors" element={<VendorManagement />} />
+          <Route path="vendor-connections" element={<SocietyVendorConnections />} />
           <Route path="complaints" element={<ComplaintManagement />} />
           <Route path="maintenance" element={<MaintenanceManagement />} />
           <Route path="notices" element={<Notices />} />
@@ -98,6 +101,7 @@ export default function App() {
           <Route path="dashboard" element={<VendorDashboard />} />
           <Route path="assignments" element={<VendorAssignments />} />
           <Route path="assignments/:id" element={<VendorAssignmentDetail />} />
+          <Route path="connections" element={<VendorConnections />} />
           <Route path="profile" element={<VendorProfile />} />
         </Route>
       </Route>

@@ -6,6 +6,10 @@ import VendorFilters from '../components/vendors/VendorFilters.jsx';
 import VendorTable from '../components/vendors/VendorTable.jsx';
 import VendorDetailsModal from '../components/vendors/VendorDetailsModal.jsx';
 import { getAllVendors } from '../lib/vendorApi.js';
+import {
+  getSocietyConnections,
+  sendConnectionRequest,
+} from '../lib/vendorConnectionApi.js';
 
 const PAGE_SIZE = 6;
 
@@ -35,6 +39,9 @@ export default function VendorManagement() {
   const [currentPage, setCurrentPage] = useState(1);
   const [successMessage, setSuccessMessage] = useState('');
   const [detailsVendor, setDetailsVendor] = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [actionError, setActionError] = useState('');
+  const [sendingId, setSendingId] = useState(null);
 
   // Debounce search input
   useEffect(() => {
@@ -75,6 +82,42 @@ export default function VendorManagement() {
   useEffect(() => {
     fetchVendors();
   }, [fetchVendors]);
+
+  const fetchConnections = useCallback(async () => {
+    try {
+      const data = await getSocietyConnections();
+      setConnections(data.data?.connections || []);
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.message || 'Failed to load vendor connections',
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
+
+  const handleSendConnectionRequest = async (vendorId) => {
+    try {
+      setSendingId(vendorId);
+      setActionError('');
+      const data = await sendConnectionRequest(vendorId);
+      setSuccessMessage(data.message);
+      await fetchConnections();
+    } catch (err) {
+      setActionError(
+        err?.response?.data?.message || 'Failed to send connection request',
+      );
+    } finally {
+      setSendingId(null);
+    }
+  };
+
+  const connectionStatusForVendor = (vendorId) => {
+    const connection = connections.find((c) => c.vendorId === vendorId);
+    return connection?.status || null;
+  };
 
   const categoryOptions = useMemo(() => {
     const fromData = new Set(vendors.map((v) => v.category).filter(Boolean));
@@ -147,6 +190,13 @@ export default function VendorManagement() {
         </div>
       )}
 
+      {actionError && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-red-50 border border-red-200 text-red-800 rounded-lg text-sm font-medium">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {actionError}
+        </div>
+      )}
+
       {successMessage && (
         <div className="flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-lg text-sm font-medium animate-in fade-in duration-200">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -197,6 +247,13 @@ export default function VendorManagement() {
         isOpen={!!detailsVendor}
         onClose={() => setDetailsVendor(null)}
         vendor={detailsVendor}
+        connectionStatus={
+          detailsVendor ? connectionStatusForVendor(detailsVendor.id) : null
+        }
+        isSendingRequest={
+          detailsVendor ? sendingId === detailsVendor.id : false
+        }
+        onSendRequest={handleSendConnectionRequest}
       />
     </div>
   );

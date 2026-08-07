@@ -192,6 +192,20 @@ export const assignVendorToComplaint = async (
     return { conflict: true, message: "This vendor is currently unavailable" };
   }
 
+  // Only vendors with an accepted connection to the admin's society can be
+  // assigned work. Connection status is the marketplace's trust bridge.
+  const connection = await prisma.vendorConnection.findFirst({
+    where: { vendorId, societyId, status: "ACCEPTED" },
+    select: { id: true },
+  });
+  if (!connection) {
+    return {
+      conflict: true,
+      message:
+        "This vendor is not connected to your society. Send a connection request first before assigning work.",
+    };
+  }
+
   const [activeVendor, activeStaff] = await Promise.all([
     prisma.vendorAssignment.findFirst({
       where: { complaintId, status: { in: ACTIVE_STATUSES } },
