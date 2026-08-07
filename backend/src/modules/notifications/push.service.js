@@ -3,12 +3,22 @@ import webpush from "web-push";
 import prisma from "../../config/prisma.js";
 import { env } from "../../config/env.js";
 
-const NOTIFICATION_ROUTES = {
-  SUPER_ADMIN: "/super-admin/notifications",
-  SOCIETY_ADMIN: "/society-admin/notifications",
-  STAFF: "/staff/notifications",
-  RESIDENT: "/resident/notifications",
-  VENDOR: "/vendor/notifications",
+const DASHBOARD_ROUTES = {
+  SUPER_ADMIN: "/super-admin/dashboard",
+  SOCIETY_ADMIN: "/society-admin/dashboard",
+  STAFF: "/staff/dashboard",
+  RESIDENT: "/resident/dashboard",
+  VENDOR: "/vendor/dashboard",
+};
+
+// Landing route that shows a role's complaint/work list (kept in sync with the
+// frontend COMPLAINT_LIST_ROUTES_BY_ROLE). The complaint detail is opened
+// through each page's existing deep-link UI via the `complaint` query param.
+const COMPLAINT_LIST_ROUTES = {
+  SOCIETY_ADMIN: "/society-admin/complaints",
+  RESIDENT: "/resident/complaints",
+  STAFF: "/staff/assigned-complaints",
+  VENDOR: "/vendor/assignments",
 };
 
 if (env.VAPID_SUBJECT && env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY) {
@@ -67,7 +77,17 @@ export const sendPushNotificationToUser = async (userId, payload) => {
   if (subscriptions.length === 0) return;
 
   const role = subscriptions[0]?.user?.role;
-  const notificationUrl = NOTIFICATION_ROUTES[role] || "/";
+
+  // Deep-link straight to the complaint (if any) using the role's existing
+  // complaint page, otherwise land on the role dashboard.
+  let notificationUrl;
+  if (payload.complaintId && COMPLAINT_LIST_ROUTES[role]) {
+    notificationUrl = `${COMPLAINT_LIST_ROUTES[role]}?complaint=${encodeURIComponent(
+      payload.complaintId
+    )}`;
+  } else {
+    notificationUrl = DASHBOARD_ROUTES[role] || "/";
+  }
 
   const body = JSON.stringify({
     title: payload.title,

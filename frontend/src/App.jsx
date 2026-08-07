@@ -6,7 +6,6 @@ import Login from "./pages/Login.jsx";
 import RegisterSociety from "./pages/RegisterSociety.jsx";
 import ActivateAccount from "./pages/ActivateAccount.jsx";
 import RegisterVendor from "./pages/vendor/RegisterVendor.jsx";
-import Notifications from "./pages/Notifications.jsx";
 
 import DashboardLayout from "./layouts/DashboardLayout.jsx";
 import ProtectedRoute from "./routes/ProtectedRoute.jsx";
@@ -68,7 +67,6 @@ export default function App() {
           <Route path="complaints" element={<ComplaintManagement />} />
           <Route path="maintenance" element={<MaintenanceManagement />} />
           <Route path="notices" element={<Notices />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -81,7 +79,6 @@ export default function App() {
           <Route path="complaints/new" element={<RaiseComplaint />} />
           <Route path="notices" element={<Notices />} />
           <Route path="payments" element={<ResidentPayments />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -91,7 +88,6 @@ export default function App() {
         <Route path="/staff" element={<DashboardLayout />}>
           <Route path="dashboard" element={<StaffDashboard />} />
           <Route path="assigned-complaints" element={<StaffAssignedComplaints />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
@@ -102,7 +98,6 @@ export default function App() {
           <Route path="dashboard" element={<VendorDashboard />} />
           <Route path="assignments" element={<VendorAssignments />} />
           <Route path="assignments/:id" element={<VendorAssignmentDetail />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<VendorProfile />} />
         </Route>
       </Route>
@@ -114,7 +109,6 @@ export default function App() {
           <Route path="societies" element={<Dashboard />} />
           <Route path="users" element={<Dashboard />} />
           <Route path="reports" element={<Dashboard />} />
-          <Route path="notifications" element={<Notifications />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>

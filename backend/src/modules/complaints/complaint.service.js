@@ -51,6 +51,7 @@ const COMPLAINT_INCLUDE = {
       id: true,
       status: true,
       note: true,
+      resolutionImageUrl: true,
       createdAt: true,
       changedBy: {
         select: { id: true, name: true, role: true },
@@ -147,6 +148,7 @@ const mapComplaint = (complaint) => {
       id: h.id,
       status: h.status,
       note: h.note || null,
+      resolutionImageUrl: h.resolutionImageUrl || null,
       createdAt: h.createdAt,
       changedBy: h.changedBy
         ? { id: h.changedBy.id, name: h.changedBy.name, role: h.changedBy.role }
@@ -388,6 +390,9 @@ export const recordStatusChange = async (
       status: newStatus,
       changedById: userId || null,
       note: note || null,
+      // Keep the resolution evidence on the RESOLVED history entry so every
+      // resolution attempt (across reopen cycles) stays visible.
+      resolutionImageUrl: extraData.afterImageUrl || null,
     },
   });
 
@@ -424,6 +429,7 @@ export const getComplaintHistory = async (complaintId, user) => {
       id: true,
       status: true,
       note: true,
+      resolutionImageUrl: true,
       createdAt: true,
       changedBy: {
         select: { id: true, name: true, role: true },
@@ -437,6 +443,7 @@ export const getComplaintHistory = async (complaintId, user) => {
       id: h.id,
       status: h.status,
       note: h.note || null,
+      resolutionImageUrl: h.resolutionImageUrl || null,
       createdAt: h.createdAt,
       changedBy: h.changedBy
         ? { id: h.changedBy.id, name: h.changedBy.name, role: h.changedBy.role }
@@ -446,8 +453,9 @@ export const getComplaintHistory = async (complaintId, user) => {
 };
 
 /**
- * Resident records satisfaction with a resolved/closed complaint. Idempotent —
- * recording twice returns the current complaint unchanged.
+ * Resident records satisfaction with a resolved/closed complaint. Confirming
+ * satisfaction closes the complaint in the same step. Idempotent — recording
+ * twice returns the current complaint unchanged.
  */
 export const markSatisfied = async (complaintId, user, { note } = {}) => {
   const societyId = await getSocietyIdForUser(user.id);
@@ -491,22 +499,30 @@ export const markSatisfied = async (complaintId, user, { note } = {}) => {
   }
 
   await prisma.$transaction(async (tx) => {
+    // Auto-close: RESOLVED → CLOSED in the same step. When the complaint is
+    // already CLOSED (e.g. closed by the admin first), keep the status and
+    // avoid adding a duplicate CLOSED entry to the status history.
+    const transitioningToClosed = complaint.status === "RESOLVED";
+
     await tx.complaint.update({
       where: { id: complaintId },
       data: {
+        ...(transitioningToClosed ? { status: "CLOSED" } : {}),
         satisfiedAt: new Date(),
         satisfactionNote: note || null,
       },
     });
 
-    await tx.complaintStatusHistory.create({
-      data: {
-        complaintId,
-        status: complaint.status,
-        changedById: user.id,
-        note: note || "Resident confirmed they are satisfied with the resolution",
-      },
-    });
+    if (transitioningToClosed) {
+      await tx.complaintStatusHistory.create({
+        data: {
+          complaintId,
+          status: "CLOSED",
+          changedById: user.id,
+          note: note || "Resident confirmed they are satisfied with the resolution",
+        },
+      });
+    }
   });
 
   const full = await prisma.complaint.findUnique({
@@ -514,9 +530,9 @@ export const markSatisfied = async (complaintId, user, { note } = {}) => {
     include: COMPLAINT_INCLUDE,
   });
 
-  // Notify the society admin that the resident is satisfied, so the complaint
-  // can be closed. Best-effort side effect — a failure must never fail the
-  // satisfaction recording itself.
+  // Notify the society admin that the complaint was closed after the resident
+  // confirmed satisfaction. Best-effort side effect — a notification failure
+  // must never fail the satisfaction recording itself.
   try {
     const adminId = await getSocietyAdminId(complaint.societyId);
     if (adminId) {
@@ -524,7 +540,7 @@ export const markSatisfied = async (complaintId, user, { note } = {}) => {
         userId: adminId,
         type: "COMPLAINT_SATISFIED",
         title: "Resident satisfied",
-        message: `The resident is satisfied with "${full.title}" — it is ready to be closed`,
+        message: `The resident is satisfied with "${full.title}" — the complaint has been closed`,
         complaintId,
       });
     }
@@ -658,19 +674,6 @@ export const changeComplaintStatus = async (
   });
 
   if (!complaint) return { notFound: true };
-
-  // A resolved complaint may only be closed once the resident has confirmed
-  // they are satisfied with the resolution.
-  if (
-    newStatus === "CLOSED" &&
-    complaint.status === "RESOLVED" &&
-    !complaint.satisfiedAt
-  ) {
-    return {
-      invalidTransition: true,
-      message: "Cannot close a resolved complaint until the resident confirms satisfaction",
-    };
-  }
 
   const result = await prisma.$transaction(async (tx) => {
     const r = await recordStatusChange(tx, complaintId, newStatus, adminUserId, note);

@@ -20,7 +20,7 @@ import {
   Shield,
   ThumbsUp,
 } from 'lucide-react';
-import { formatDateTime } from '../../lib/format.js';
+import { formatDateTime, resolveImageUrl } from '../../lib/format.js';
 import StatusTimeline from './StatusTimeline.jsx';
 import BeforeAfterImages from './BeforeAfterImages.jsx';
 import ReopenComplaintModal from './ReopenComplaintModal.jsx';
@@ -127,8 +127,9 @@ export default function ComplaintDetailsDrawer({
       setActionSuccess('Complaint closed successfully.');
       if (onStatusUpdated) onStatusUpdated();
     } catch (err) {
-      setActionSuccess('Complaint closed successfully.');
-      complaint.status = 'CLOSED';
+      setActionError(
+        err?.response?.data?.message || 'Could not close the complaint. Please try again.'
+      );
     } finally {
       setIsActionLoading(false);
     }
@@ -144,8 +145,9 @@ export default function ComplaintDetailsDrawer({
       setActionSuccess('Complaint reopened successfully.');
       if (onStatusUpdated) onStatusUpdated();
     } catch (err) {
-      setActionSuccess('Complaint reopened successfully.');
-      complaint.status = 'REOPENED';
+      setActionError(
+        err?.response?.data?.message || 'Could not reopen the complaint. Please try again.'
+      );
       setReopenModalOpen(false);
     } finally {
       setIsActionLoading(false);
@@ -162,11 +164,9 @@ export default function ComplaintDetailsDrawer({
     setActionSuccess('');
     setIsActionLoading(true);
     try {
-      const response = await markSatisfied(complaint.id, { note });
-      complaint.satisfiedAt = response.data?.satisfiedAt || new Date().toISOString();
-      complaint.satisfactionNote = note || null;
+      await markSatisfied(complaint.id, { note });
       setSatisfactionModalOpen(false);
-      setActionSuccess('Satisfaction recorded. The Society Admin can now close the complaint.');
+      setActionSuccess('Satisfaction recorded. Your complaint has been closed.');
       if (onStatusUpdated) onStatusUpdated();
     } catch (err) {
       setActionError(
@@ -438,6 +438,39 @@ export default function ComplaintDetailsDrawer({
                     )}
                   </div>
 
+                  {/* Resolution History (every resolution attempt across reopen cycles) */}
+                  {(complaint.statusHistory || []).filter(
+                    (h) => h.status === 'RESOLVED' && h.resolutionImageUrl
+                  ).length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+                      <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider">
+                        <History className="w-4 h-4 text-emerald-600" />
+                        <span>Resolution History</span>
+                      </div>
+                      <div className="space-y-4">
+                        {(complaint.statusHistory || [])
+                          .filter((h) => h.status === 'RESOLVED' && h.resolutionImageUrl)
+                          .map((h, index) => (
+                            <div key={h.id || `resolution-${index}`} className="flex gap-3.5 items-start">
+                              <img
+                                src={resolveImageUrl(h.resolutionImageUrl)}
+                                alt={`Resolution ${index + 1}`}
+                                className="h-24 w-36 rounded-lg object-cover border border-slate-200 shrink-0"
+                              />
+                              <div className="text-xs space-y-1">
+                                <p className="font-bold text-slate-800">Resolution #{index + 1}</p>
+                                <p className="text-slate-400">
+                                  {formatDateTime(h.createdAt)}
+                                  {h.changedBy?.name ? ` by ${h.changedBy.name}` : ''}
+                                </p>
+                                {h.note && <p className="text-slate-600 leading-relaxed">{h.note}</p>}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Assignment History */}
                   <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-3">
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -609,27 +642,20 @@ export default function ComplaintDetailsDrawer({
                     </button>
                   )}
 
-                  {/* Admin: Close Complaint (after resident confirms satisfaction) */}
+                  {/* Admin: Close Complaint (when resolved) */}
                   {isAdmin && currentStatus === 'RESOLVED' && (
-                    complaint.satisfiedAt ? (
-                      <button
-                        onClick={handleCloseComplaint}
-                        disabled={isActionLoading}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {isActionLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Lock className="w-4 h-4" />
-                        )}
-                        <span>Close Complaint</span>
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-500 bg-slate-100 rounded-lg border border-dashed border-slate-300">
-                        <ThumbsUp className="w-4 h-4" />
-                        Awaiting resident confirmation
-                      </span>
-                    )
+                    <button
+                      onClick={handleCloseComplaint}
+                      disabled={isActionLoading}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-semibold shadow-sm transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      {isActionLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Lock className="w-4 h-4" />
+                      )}
+                      <span>Close Complaint</span>
+                    </button>
                   )}
 
                   {/* Resident: Reopen Button */}

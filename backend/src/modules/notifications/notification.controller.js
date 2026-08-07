@@ -11,8 +11,8 @@ import {
 import asyncHandler from "../../utils/asyncHandler.js";
 
 export const getMyNotificationsHandler = asyncHandler(async (req, res) => {
-  const { page, limit } = req.query;
-  const result = await listUserNotifications(req.user.id, { page, limit });
+  const { page, limit, read } = req.query;
+  const result = await listUserNotifications(req.user.id, { page, limit, read });
 
   return successResponse(res, 200, "Notifications fetched successfully", result);
 });

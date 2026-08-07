@@ -244,12 +244,13 @@ model Complaint {
 }
 
 model ComplaintStatusHistory {
-  id          String          @id @default(cuid())
-  complaintId String
-  status      ComplaintStatus
-  changedById String?
-  note        String?
-  createdAt   DateTime        @default(now())
+  id                 String          @id @default(cuid())
+  complaintId        String
+  status             ComplaintStatus
+  changedById        String?
+  note               String?
+  resolutionImageUrl String?
+  createdAt          DateTime        @default(now())
 
   complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
   changedBy User?     @relation(fields: [changedById], references: [id], onDelete: SetNull)

@@ -98,6 +98,7 @@ const STAFF_ASSIGNMENT_INCLUDE_SELF = {
           id: true,
           status: true,
           note: true,
+          resolutionImageUrl: true,
           createdAt: true,
           changedBy: {
             select: { id: true, name: true, role: true },
@@ -155,8 +156,7 @@ const mapStaffAssignment = (assignment) => ({
               name: assignment.complaint.resident.user.name,
               phone: assignment.complaint.resident.user.phone,
               email: assignment.complaint.resident.user.email,
-              flatNumber:
-                assignment.complaint.resident.flat?.flatNumber || "",
+              flatNumber: assignment.complaint.resident.flat?.flatNumber || "",
               wing: assignment.complaint.resident.flat?.wing || "",
             }
           : null,
@@ -164,6 +164,7 @@ const mapStaffAssignment = (assignment) => ({
           id: h.id,
           status: h.status,
           note: h.note || null,
+          resolutionImageUrl: h.resolutionImageUrl || null,
           createdAt: h.createdAt,
           changedBy: h.changedBy
             ? {
@@ -260,7 +261,16 @@ export const assignStaffToComplaint = async (
 
   const complaint = await prisma.complaint.findFirst({
     where: { id: complaintId, societyId },
-    select: { id: true, title: true, status: true },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      resident: {
+        select: {
+          userId: true,
+        },
+      },
+    },
   });
   if (!complaint) return { notFound: true };
 
@@ -290,14 +300,20 @@ export const assignStaffToComplaint = async (
     };
   }
 
-  const active = await prisma.staffAssignment.findFirst({
-    where: { complaintId, status: { in: ACTIVE_STATUSES } },
-    select: { id: true },
-  });
-  if (active) {
+  const [activeStaff, activeVendor] = await Promise.all([
+    prisma.staffAssignment.findFirst({
+      where: { complaintId, status: { in: ACTIVE_STATUSES } },
+      select: { id: true },
+    }),
+    prisma.vendorAssignment.findFirst({
+      where: { complaintId, status: { in: ACTIVE_STATUSES } },
+      select: { id: true },
+    }),
+  ]);
+  if (activeStaff || activeVendor) {
     return {
       conflict: true,
-      message: "Complaint already has an active staff assignment",
+      message: "Complaint already has an active staff or vendor assignment",
     };
   }
 
@@ -353,6 +369,23 @@ export const assignStaffToComplaint = async (
     });
   } catch (error) {
     console.error("Failed to create staff assignment notification:", error);
+  }
+
+  try {
+    if (complaint.resident?.userId) {
+      await createNotification({
+        userId: complaint.resident.userId,
+        type: "STAFF_ASSIGNMENT",
+        title: "Staff assigned to your complaint",
+        message: `A staff member has been assigned to your complaint "${complaint.title}"`,
+        complaintId,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "Failed to create resident staff assignment notification:",
+      error,
+    );
   }
 
   return { assignment: mapStaffAssignmentAdmin(fullAssignment) };
@@ -428,8 +461,8 @@ export const getStaffAssignmentById = async (userId, assignmentId) => {
  *   IN_PROGRESS → COMPLETED
  *
  * Complaint side-effects:
- *   ACCEPTED    → complaint IN_PROGRESS + history entry
- *   IN_PROGRESS → (complaint already IN_PROGRESS — no redundant update)
+ *   ACCEPTED    → complaint ACCEPTED + history entry
+ *   IN_PROGRESS → complaint IN_PROGRESS + history entry
  *   COMPLETED   → complaint RESOLVED + history entry + afterImageUrl saved
  *   CANCELLED   → complaint OPEN + history entry
  *
@@ -462,7 +495,8 @@ export const updateStaffAssignmentStatus = async (
   if (status === "COMPLETED" && !afterImageUrl) {
     return {
       validationError: true,
-      message: "An after-resolution image is required to complete the assignment",
+      message:
+        "An after-resolution image is required to complete the assignment",
     };
   }
 
@@ -470,6 +504,7 @@ export const updateStaffAssignmentStatus = async (
   // transaction, so we surface a clear error without partial writes.
   if (
     status === "ACCEPTED" ||
+    status === "IN_PROGRESS" ||
     status === "COMPLETED" ||
     status === "CANCELLED"
   ) {
@@ -480,10 +515,12 @@ export const updateStaffAssignmentStatus = async (
 
     const targetComplaintStatus =
       status === "ACCEPTED"
-        ? "IN_PROGRESS"
-        : status === "COMPLETED"
-          ? "RESOLVED"
-          : "OPEN"; // CANCELLED
+        ? "ACCEPTED"
+        : status === "IN_PROGRESS"
+          ? "IN_PROGRESS"
+          : status === "COMPLETED"
+            ? "RESOLVED"
+            : "OPEN"; // CANCELLED
 
     if (
       !VALID_COMPLAINT_TRANSITIONS[complaint.status]?.includes(
@@ -515,22 +552,20 @@ export const updateStaffAssignmentStatus = async (
       const r = await recordStatusChange(
         tx,
         assignment.complaintId,
-        "IN_PROGRESS",
+        "ACCEPTED",
         userId,
         "Staff accepted the assignment",
       );
       if (r?.invalidTransition) throw new Error(r.message);
     } else if (status === "IN_PROGRESS") {
-      // Complaint is already IN_PROGRESS from the ACCEPTED transition.
-      // No redundant status update needed — just append a history note.
-      await tx.complaintStatusHistory.create({
-        data: {
-          complaintId: assignment.complaintId,
-          status: "IN_PROGRESS",
-          changedById: userId,
-          note: "Staff started work on the complaint",
-        },
-      });
+      const r = await recordStatusChange(
+        tx,
+        assignment.complaintId,
+        "IN_PROGRESS",
+        userId,
+        "Staff started work on the complaint",
+      );
+      if (r?.invalidTransition) throw new Error(r.message);
     } else if (status === "COMPLETED") {
       const r = await recordStatusChange(
         tx,
@@ -582,7 +617,7 @@ export const updateStaffAssignmentStatus = async (
     }
   }
 
-  // Admin is notified when staff starts work.
+  // Admin + Resident are notified when staff starts work.
   if (status === "IN_PROGRESS") {
     try {
       const adminId = await getSocietyAdminId(updated.societyId);
@@ -592,6 +627,20 @@ export const updateStaffAssignmentStatus = async (
           type: "STAFF_IN_PROGRESS",
           title: "Staff started work",
           message: `${updated.staff.user.name} started work on complaint "${updated.complaint.title}"`,
+          complaintId: updated.complaintId,
+        });
+      }
+
+      const resident = await prisma.resident.findUnique({
+        where: { id: updated.complaint.resident.id },
+        select: { userId: true },
+      });
+      if (resident?.userId) {
+        await createNotification({
+          userId: resident.userId,
+          type: "STAFF_IN_PROGRESS",
+          title: "Staff started work",
+          message: `${updated.staff.user.name} started work on your complaint "${updated.complaint.title}"`,
           complaintId: updated.complaintId,
         });
       }

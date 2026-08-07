@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Bell, LogOut, Menu, CheckCheck, Loader2, Inbox } from "lucide-react";
 import { useAuth } from "../../context/AuthContext.jsx";
-// import {
-//   getNotifications,
-//   markNotificationRead,
-//   markAllNotificationsRead,
-// } from '../../lib/notificationApi.js';
 import { formatDateTime } from "../../lib/format.js";
-import { NOTIFICATION_ROUTES_BY_ROLE } from "../../lib/routes.js";
+import { complaintDeepLinkRoute } from "../../lib/routes.js";
 import { useNotifications } from "../../context/NotificationContext.jsx";
 /**
  * Route path to user-friendly page title mapping.
@@ -19,7 +14,6 @@ const PAGE_TITLES = {
   "/super-admin/societies": "Societies Management",
   "/super-admin/users": "Users Directory",
   "/super-admin/reports": "System Reports",
-  "/super-admin/notifications": "Notifications",
   "/super-admin/profile": "Super Admin Profile",
 
   // Society Admin
@@ -31,13 +25,11 @@ const PAGE_TITLES = {
   "/society-admin/complaints": "Complaints Management",
   "/society-admin/maintenance": "Maintenance Records",
   "/society-admin/notices": "Society Notices",
-  "/society-admin/notifications": "Notifications",
   "/society-admin/profile": "Society Admin Profile",
 
   // Staff
   "/staff/dashboard": "Staff Dashboard",
   "/staff/assigned-complaints": "Assigned Complaints",
-  "/staff/notifications": "Notifications",
   "/staff/profile": "Staff Profile",
 
   // Resident
@@ -47,14 +39,12 @@ const PAGE_TITLES = {
   "/resident/complaints/new": "Raise a Complaint",
   "/resident/notices": "Community Notices",
   "/resident/payments": "Maintenance Payments",
-  "/resident/notifications": "Notifications",
   "/resident/profile": "Resident Profile",
 
   // Vendor
   "/vendor/dashboard": "Vendor Dashboard",
   "/vendor/assignments": "My Assignments",
   "/vendor/assignments/": "Assignment Details",
-  "/vendor/notifications": "Notifications",
   "/vendor/profile": "Vendor Profile",
 
   // Public
@@ -82,13 +72,8 @@ export default function Header({ onMenuClick }) {
   } = useNotifications();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  // const [recentNotifications, setNotifications] = useState([]);
-  // const [unreadCount, setUnread] = useState(0);
-  // const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
   const dropdownRef = useRef(null);
-
-  
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -100,26 +85,6 @@ export default function Header({ onMenuClick }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // const fetchNotifications = useCallback(async () => {
-  //   try {
-  //     setIsLoadingNotifications(true);
-  //     const data = await getNotifications({ page: 1, limit: 5 });
-  //     setNotifications(data.data?.notifications || []);
-  //     setUnread(data.data?.unread || 0);
-  //   } catch {
-  //     setNotifications([]);
-  //     setUnread(0);
-  //   } finally {
-  //     setIsLoadingNotifications(false);
-  //   }
-  // }, []);
-
-  // useEffect(() => {
-  //   if (user) {
-  //     fetchNotifications();
-  //   }
-  // }, [user, fetchNotifications]);
 
   // Resolve dynamic paths (e.g. /vendor/assignments/:id)
   const resolveTitle = (path) => {
@@ -143,8 +108,6 @@ export default function Header({ onMenuClick }) {
     setMarkingAll(true);
     try {
       await markAllNotificationsRead();
-      // setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      // setUnread(0);
     } catch {
       // ignore
     } finally {
@@ -155,10 +118,6 @@ export default function Header({ onMenuClick }) {
   const handleMarkRead = async (id) => {
     try {
       await markNotificationRead(id);
-      // setNotifications((prev) =>
-      //   prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      // );
-      // setUnread((prev) => Math.max(0, prev - 1));
     } catch {
       // ignore
     }
@@ -168,19 +127,14 @@ export default function Header({ onMenuClick }) {
     if (!notification.isRead) {
       await handleMarkRead(notification.id);
     }
-    // Clicking an individual notification opens the user's Notifications page.
-    // Complaint deep-linking then happens from that page.
-    const route = NOTIFICATION_ROUTES_BY_ROLE[user?.role];
+    // Opening a notification marks it as read and removes it from the popup
+    // immediately (see NotificationContext). If it is linked to a complaint,
+    // take the user straight to that item using their role's existing route.
+    const route = complaintDeepLinkRoute(user?.role, notification.complaintId);
     if (route) {
       setDropdownOpen(false);
       navigate(route);
     }
-  };
-
-  const handleViewAll = () => {
-    setDropdownOpen(false);
-    const route = NOTIFICATION_ROUTES_BY_ROLE[user?.role];
-    if (route) navigate(route);
   };
 
   const typeStyle = (type) =>
@@ -223,7 +177,7 @@ export default function Header({ onMenuClick }) {
             <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl border border-slate-200 shadow-xl shadow-slate-200/50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 origin-top-right">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/60">
                 <p className="text-sm font-bold text-slate-800">
-                  RNotifications
+                  Notifications
                 </p>
                 <button
                   onClick={handleMarkAllRead}
@@ -247,7 +201,7 @@ export default function Header({ onMenuClick }) {
                 ) : recentNotifications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                     <Inbox className="w-8 h-8 mb-2 text-slate-300" />
-                    <p className="text-xs font-medium">No notifications yet</p>
+                    <p className="text-xs font-medium">You're all caught up</p>
                   </div>
                 ) : (
                   recentNotifications.map((notification) => (
@@ -284,15 +238,6 @@ export default function Header({ onMenuClick }) {
                     </button>
                   ))
                 )}
-              </div>
-
-              <div className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/60">
-                <button
-                  onClick={handleViewAll}
-                  className="w-full text-center text-sm font-semibold text-indigo-600 hover:text-indigo-800 py-1 cursor-pointer"
-                >
-                  View all notifications
-                </button>
               </div>
             </div>
           )}
