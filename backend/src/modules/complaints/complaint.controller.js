@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+
 import {
   createComplaint,
   listComplaints,
@@ -18,6 +20,7 @@ export const createComplaintHandler = asyncHandler(async (req, res) => {
   const data = { ...req.body };
   if (req.file) {
     data.imageUrl = `/uploads/complaints/${req.file.filename}`;
+    data.imagePath = req.file.path;
   }
   const result = await createComplaint(req.user, data);
 
@@ -27,6 +30,21 @@ export const createComplaintHandler = asyncHandler(async (req, res) => {
 
   if (result.notFound) {
     return errorResponse(res, 404, result.message);
+  }
+
+  if (result.duplicate) {
+    const existing = result.existingComplaint;
+    // The uploaded file has no matching complaint — remove it from storage so
+    // it does not become an orphaned file on disk.
+    if (req.file?.path) {
+      fs.unlink(req.file.path).catch(() => {});
+    }
+    return errorResponse(
+      res,
+      409,
+      `Possible duplicate complaint: "${existing.title}" (${existing.status}) already exists. A similar complaint or image has already been reported in this society, so no new complaint was created.`,
+      { existingComplaint: existing }
+    );
   }
 
   return successResponse(res, 201, "Complaint created successfully", result);

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, AlertCircle, Clock, Wrench, CheckCircle2,
-  User, ChevronRight, Loader2,
+  User, ChevronRight, Loader2, RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import Button from '../Button.jsx';
@@ -14,6 +14,16 @@ const STATUS_CONFIG = {
     className: 'bg-amber-50 text-amber-700 border border-amber-200',
     icon: AlertCircle,
   },
+  ASSIGNED: {
+    label: 'Assigned',
+    className: 'bg-purple-50 text-purple-700 border border-purple-200',
+    icon: Clock,
+  },
+  ACCEPTED: {
+    label: 'Accepted',
+    className: 'bg-blue-50 text-blue-700 border border-blue-200',
+    icon: CheckCircle2,
+  },
   IN_PROGRESS: {
     label: 'In Progress',
     className: 'bg-blue-50 text-blue-700 border border-blue-200',
@@ -23,6 +33,16 @@ const STATUS_CONFIG = {
     label: 'Resolved',
     className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     icon: CheckCircle2,
+  },
+  CLOSED: {
+    label: 'Closed',
+    className: 'bg-slate-100 text-slate-600 border border-slate-200',
+    icon: CheckCircle2,
+  },
+  REOPENED: {
+    label: 'Reopened',
+    className: 'bg-orange-50 text-orange-700 border border-orange-200',
+    icon: RotateCcw,
   },
 };
 
@@ -66,33 +86,48 @@ export default function ResidentDashboard() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const hasLoadedRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchDashboardData() {
-      setIsLoading(true);
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const data = await getComplaints({ page: 1, limit: 100 });
+      const list = data?.data?.complaints ?? [];
+      setComplaints(list);
+      setTotal(data?.data?.total ?? 0);
       setError('');
-      try {
-        const data = await getComplaints({ page: 1, limit: 100 });
-        if (!cancelled) {
-          const list = data?.data?.complaints ?? [];
-          setComplaints(list);
-          setTotal(data?.data?.total ?? 0);
-        }
-      } catch {
-        if (!cancelled) {
-          setError('Failed to load dashboard data.');
-          setComplaints([]);
-        }
-      } finally {
-        if (!cancelled) setIsLoading(false);
+      hasLoadedRef.current = true;
+    } catch {
+      // Surface an error only when there is nothing to show yet. Background
+      // refreshes (polling / focus) must not wipe the dashboard content.
+      if (!hasLoadedRef.current) {
+        setError('Failed to load dashboard data.');
+        setComplaints([]);
       }
+    } finally {
+      setIsLoading(false);
     }
-
-    fetchDashboardData();
-    return () => { cancelled = true; };
   }, []);
+
+  // Keep the dashboard synchronized with the database: fetch on mount, then
+  // poll periodically and refresh whenever the tab regains focus. Uses the
+  // existing complaints API — no new realtime transport.
+  useEffect(() => {
+    fetchDashboardData();
+    const POLL_INTERVAL_MS = 30000;
+    const intervalId = setInterval(fetchDashboardData, POLL_INTERVAL_MS);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchDashboardData();
+    };
+    window.addEventListener('focus', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [fetchDashboardData]);
 
   const displayName = user?.firstName
     ? `${user.firstName} ${user.lastName || ''}`.trim()
@@ -248,7 +283,18 @@ export default function ResidentDashboard() {
                 {recentComplaints.map((complaint) => (
                   <div
                     key={complaint.id}
-                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() =>
+                      navigate(`/resident/complaints?complaint=${encodeURIComponent(complaint.id)}`)
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/resident/complaints?complaint=${encodeURIComponent(complaint.id)}`);
+                      }
+                    }}
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-slate-50/70 transition-colors cursor-pointer"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs text-indigo-600 font-semibold mb-0.5">
@@ -264,6 +310,7 @@ export default function ResidentDashboard() {
                       </div>
                     </div>
                     <StatusBadge status={complaint.status} />
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
                   </div>
                 ))}
               </div>
