@@ -47,6 +47,7 @@ export default function ComplaintDetailsDrawer({
   onStatusUpdated,
   staffList = [],
   vendorList = [],
+  unconnectedVendorCount = 0,
   isLoadingStaff = false,
   isLoadingVendors = false,
 }) {
@@ -691,6 +692,7 @@ export default function ComplaintDetailsDrawer({
         complaint={complaint}
         staffList={staffList}
         vendorList={vendorList}
+        unconnectedVendorCount={unconnectedVendorCount}
         isLoadingStaff={isLoadingStaff}
         isLoadingVendors={isLoadingVendors}
         onAssign={handleAssignSubmit}

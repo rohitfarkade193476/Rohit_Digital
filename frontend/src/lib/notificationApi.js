@@ -1,14 +1,13 @@
-
-import axiosInstance from './axiosInstance.js';
+import axiosInstance from "./axiosInstance.js";
 
 /**
  * List the authenticated user's notifications.
  * @param {{ page?: number, limit?: number }} params
  * @returns {Promise<{ success: boolean, message: string, data: { notifications: object[], total: number, unread: number, page: number, limit: number, totalPages: number } }>}
  */
-export async function getNotifications({ page = 1, limit = 20 } = {}) {
-  const response = await axiosInstance.get('/api/notifications', {
-    params: { page, limit },
+export async function getNotifications({ page = 1, limit = 20, read } = {}) {
+  const response = await axiosInstance.get("/api/notifications", {
+    params: { page, limit, ...(read !== undefined ? { read } : {}) },
   });
   return response.data;
 }
@@ -28,6 +27,6 @@ export async function markNotificationRead(id) {
  * @returns {Promise<{ success: boolean, message: string }>}
  */
 export async function markAllNotificationsRead() {
-  const response = await axiosInstance.patch('/api/notifications/read-all');
+  const response = await axiosInstance.patch("/api/notifications/read-all");
   return response.data;
 }
