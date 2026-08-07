@@ -1,3 +1,6 @@
+import path from "path";
+import sharp from "sharp";
+
 import prisma from "../../config/prisma.js";
 import { createNotification } from "../notifications/notification.service.js";
 
@@ -180,6 +183,170 @@ export const getSocietyAdminId = async (societyId) => {
   return admin?.id || null;
 };
 
+const TITLE_SIMILARITY_THRESHOLD = 0.5;
+const DESCRIPTION_SIMILARITY_THRESHOLD = 0.7;
+
+const SIMILAR_CATEGORY_GROUPS = [["plumbing", "water supply"]];
+
+const STOPWORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has",
+  "have", "i", "in", "is", "it", "me", "my", "not", "of", "on", "or",
+  "please", "that", "the", "there", "this", "to", "was", "with", "you",
+]);
+
+const normalizeText = (text) =>
+  String(text || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokenize = (text) =>
+  normalizeText(text)
+    .split(" ")
+    .filter((token) => token.length > 1 && !STOPWORDS.has(token));
+
+const jaccardSimilarity = (tokensA, tokensB) => {
+  if (!tokensA.length || !tokensB.length) return 0;
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
+  const intersection = [...setA].filter((token) => setB.has(token)).length;
+  const union = new Set([...setA, ...setB]).size;
+  return union === 0 ? 0 : intersection / union;
+};
+
+const textSimilarityScore = (textA, textB) =>
+  jaccardSimilarity(tokenize(textA), tokenize(textB));
+
+const normalizeCategory = (category) => String(category || "").trim().toLowerCase();
+
+const sameOrSimilarCategory = (categoryA, categoryB) => {
+  const a = normalizeCategory(categoryA);
+  const b = normalizeCategory(categoryB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return SIMILAR_CATEGORY_GROUPS.some((group) => group.includes(a) && group.includes(b));
+};
+
+const isTextuallySimilar = (candidate, existing) => {
+  if (textSimilarityScore(candidate.title, existing.title) >= TITLE_SIMILARITY_THRESHOLD) {
+    return true;
+  }
+  if (candidate.description && existing.description) {
+    if (textSimilarityScore(candidate.description, existing.description) >= DESCRIPTION_SIMILARITY_THRESHOLD) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * Heuristic duplicate check. A complaint is treated as a possible duplicate
+ * when the same resident already has an open complaint (status NOT CLOSED)
+ * with a same/similar category and a textually similar title or description.
+ * CLOSED complaints never count as duplicates.
+ */
+export const isDuplicateComplaint = (candidate, existing) => {
+  if (!existing) return false;
+  if (existing.status === "CLOSED") return false;
+  if (!sameOrSimilarCategory(candidate.category, existing.category)) return false;
+  return isTextuallySimilar(candidate, existing);
+};
+
+// ── Image similarity (perceptual difference hash) ─────────────────────────
+// Images are compared by a 64-bit dHash computed with sharp (already used for
+// uploads). Files with different names but identical/similar pixels produce
+// nearby hashes; the Hamming distance between them is the similarity signal.
+
+const DHASH_WIDTH = 9;
+const DHASH_HEIGHT = 8;
+const IMAGE_HASH_HAMMING_THRESHOLD = 12; // out of 64 bits
+
+const resolveImageFilePath = (imageUrl) =>
+  path.resolve(process.cwd(), String(imageUrl).replace(/^\/+/, ""));
+
+const computeDHash = (rawGrayBuffer) => {
+  let bits = "";
+  for (let y = 0; y < DHASH_HEIGHT; y++) {
+    for (let x = 0; x < DHASH_HEIGHT; x++) {
+      const left = rawGrayBuffer[y * DHASH_WIDTH + x];
+      const right = rawGrayBuffer[y * DHASH_WIDTH + x + 1];
+      bits += left > right ? "1" : "0";
+    }
+  }
+  return BigInt(`0b${bits}`).toString(16).padStart(16, "0");
+};
+
+export const hashImageFile = async (imagePath) => {
+  const rawGrayBuffer = await sharp(imagePath)
+    .resize(DHASH_WIDTH, DHASH_HEIGHT, { fit: "fill" })
+    .grayscale()
+    .raw()
+    .toBuffer();
+  return computeDHash(rawGrayBuffer);
+};
+
+const hammingDistance = (hashA, hashB) => {
+  let xor = BigInt(`0x${hashA}`) ^ BigInt(`0x${hashB}`);
+  let distance = 0;
+  while (xor > 0n) {
+    xor &= xor - 1n;
+    distance += 1;
+  }
+  return distance;
+};
+
+export const imagesAreSimilar = (candidateHash, existingHash) =>
+  Boolean(candidateHash) &&
+  Boolean(existingHash) &&
+  hammingDistance(candidateHash, existingHash) <= IMAGE_HASH_HAMMING_THRESHOLD;
+
+const getImageHashFromUrl = async (imageUrl) => {
+  if (!imageUrl) return null;
+  try {
+    return await hashImageFile(resolveImageFilePath(imageUrl));
+  } catch (error) {
+    console.error("Failed to hash existing complaint image:", error);
+    return null;
+  }
+};
+
+const findPotentialDuplicateComplaint = async (residentId, candidate) => {
+  const existingComplaints = await prisma.complaint.findMany({
+    where: { residentId, status: { not: "CLOSED" } },
+    select: {
+      id: true,
+      title: true,
+      description: true,
+      category: true,
+      status: true,
+      createdAt: true,
+      imageUrl: true,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  for (const existing of existingComplaints) {
+    if (isDuplicateComplaint(candidate, existing)) return existing;
+  }
+
+  // Image-based duplicate: same resident + active + same/similar category and
+  // a perceptually similar image. Hashes are computed on the fly from the
+  // stored files (reuses the existing uploads/complaints storage).
+  if (candidate.imageHash) {
+    for (const existing of existingComplaints) {
+      if (!existing.imageUrl) continue;
+      if (!sameOrSimilarCategory(candidate.category, existing.category)) continue;
+      const existingHash = await getImageHashFromUrl(existing.imageUrl);
+      if (existingHash && imagesAreSimilar(candidate.imageHash, existingHash)) {
+        return existing;
+      }
+    }
+  }
+
+  return null;
+};
+
 export const createComplaint = async (user, data) => {
   const societyId = await getSocietyIdForUser(user.id);
   if (!societyId) return { forbidden: true };
@@ -214,6 +381,37 @@ export const createComplaint = async (user, data) => {
 
     residentId = resident.id;
     flatId = resident.flatId;
+  }
+
+  let candidateImageHash = null;
+  if (data.imagePath) {
+    try {
+      candidateImageHash = await hashImageFile(data.imagePath);
+    } catch (error) {
+      console.error("Failed to hash uploaded complaint image:", error);
+    }
+  }
+
+  const duplicate = await findPotentialDuplicateComplaint(residentId, {
+    title: data.title,
+    description: data.description || null,
+    category: data.category,
+    imageHash: candidateImageHash,
+  });
+
+  if (duplicate) {
+    return {
+      duplicate: true,
+      existingComplaint: {
+        id: duplicate.id,
+        title: duplicate.title,
+        description: duplicate.description,
+        category: duplicate.category,
+        status: duplicate.status,
+        createdAt: duplicate.createdAt,
+        imageUrl: duplicate.imageUrl,
+      },
+    };
   }
 
   const complaint = await prisma.$transaction(async (tx) => {

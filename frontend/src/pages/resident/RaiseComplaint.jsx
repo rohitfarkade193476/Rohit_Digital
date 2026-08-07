@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,7 @@ import Button from '../../components/Button.jsx';
 import Input from '../../components/Input.jsx';
 import { raiseComplaintSchema, COMPLAINT_CATEGORIES } from '../../schemas/resident/complaintSchema.js';
 import { createComplaint, createComplaintWithImage } from '../../lib/complaintApi.js';
+import { resolveImageUrl } from '../../lib/format.js';
 
 const PRIORITIES = [
   { value: 'LOW', label: 'Low', description: 'Minor inconvenience, not time-sensitive' },
@@ -29,6 +30,7 @@ export default function RaiseComplaint() {
 
   const [serverError, setServerError] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [duplicate, setDuplicate] = useState(null);
 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -52,6 +54,12 @@ export default function RaiseComplaint() {
   });
 
   const watchedPriority = watch('priority');
+  const watchedFields = watch(['title', 'description', 'category']);
+
+  useEffect(() => {
+    if (duplicate) setDuplicate(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedFields.title, watchedFields.description, watchedFields.category]);
 
   function handleImageChange(e) {
     const file = e.target.files?.[0];
@@ -85,6 +93,7 @@ export default function RaiseComplaint() {
   async function onSubmit(data) {
     setServerError('');
     setImageError('');
+    setDuplicate(null);
 
     try {
       if (imageFile) {
@@ -105,6 +114,12 @@ export default function RaiseComplaint() {
       }
       setSubmitted(true);
     } catch (err) {
+      const duplicateInfo = err?.response?.data?.errors?.existingComplaint;
+      if (err?.response?.status === 409 || duplicateInfo) {
+        setDuplicate(duplicateInfo);
+        setServerError('');
+        return;
+      }
       const message =
         err?.response?.data?.message ||
         err?.response?.data?.errors?.[0]?.message ||
@@ -168,6 +183,53 @@ export default function RaiseComplaint() {
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
           <span>{serverError}</span>
+        </div>
+      )}
+
+      {/* Duplicate complaint warning */}
+      {duplicate && (
+        <div role="alert" className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div className="space-y-1.5 text-sm min-w-0">
+              <p className="font-bold text-amber-900">Possible duplicate complaint</p>
+              <p className="text-amber-800">
+                <span className="font-semibold">"{duplicate.title}"</span> — Status:{' '}
+                <span className="font-semibold">
+                  {duplicate.status?.replace('_', ' ')}
+                </span>
+              </p>
+              <p className="text-amber-700">
+                A similar complaint is already in progress. Please check the existing complaint before submitting.
+              </p>
+              {duplicate.imageUrl && (
+                <div className="pt-1">
+                  <img
+                    src={resolveImageUrl(duplicate.imageUrl)}
+                    alt="Existing complaint"
+                    className="h-24 w-32 object-cover rounded-lg border border-amber-200"
+                  />
+                </div>
+              )}
+              <div className="pt-1.5 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/resident/complaints?complaint=${encodeURIComponent(duplicate.id)}`)
+                  }
+                >
+                  View Existing Complaint
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDuplicate(null)}
+                >
+                  Continue Editing
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
