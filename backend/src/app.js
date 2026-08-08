@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import { env } from "./config/env.js";
 
 import { auth } from "./lib/auth.js";
-import superAdminRoutes from "./modules/auth/super-admin.routes.js";
+import superAdminRoutes from "./modules/super-admin/super-admin.routes.js";
 import societyRoutes from "./modules/society/society.routes.js";
 import flatRoutes from "./modules/flat/flat.routes.js";
 import residentRoutes from "./modules/resident/resident.routes.js";

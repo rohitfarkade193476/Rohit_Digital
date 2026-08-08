@@ -27,6 +27,10 @@ const RESET_PASSWORD_ERROR_MAP = {
   PASSWORD_TOO_LONG: "Password must be at most 128 characters long.",
 };
 
+const FORBIDDEN_ERROR_MAP = {
+  SUPER_ADMIN_LOCKED: "Super admin accounts cannot be modified.",
+};
+
 const errorHandler = (err, req, res, next) => {
   console.error("Error:", err);
 
@@ -65,6 +69,11 @@ const errorHandler = (err, req, res, next) => {
   // Better Auth reset-password / password-setup errors
   if (RESET_PASSWORD_ERROR_MAP[code]) {
     return errorResponse(res, 400, RESET_PASSWORD_ERROR_MAP[code]);
+  }
+
+  // Forbidden actions (e.g. tampering with super admin accounts)
+  if (FORBIDDEN_ERROR_MAP[code]) {
+    return errorResponse(res, 403, FORBIDDEN_ERROR_MAP[code]);
   }
 
   // Default

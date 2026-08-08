@@ -25,6 +25,11 @@ import VendorManagement from "./pages/VendorManagement.jsx";
 import SocietyVendorConnections from "./pages/VendorConnections.jsx";
 import MaintenanceManagement from "./pages/MaintenanceManagement.jsx";
 
+// Super Admin Pages
+import SuperAdminSocieties from "./pages/SuperAdminSocieties.jsx";
+import SuperAdminUsers from "./pages/SuperAdminUsers.jsx";
+import SuperAdminReports from "./pages/SuperAdminReports.jsx";
+
 // Resident Pages
 import ResidentDashboard from "./components/dashboards/ResidentDashboard.jsx";
 import ResidentComplaints from "./pages/resident/ResidentComplaints.jsx";
@@ -110,9 +115,9 @@ export default function App() {
       <Route element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]} />}>
         <Route path="/super-admin" element={<DashboardLayout />}>
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="societies" element={<Dashboard />} />
-          <Route path="users" element={<Dashboard />} />
-          <Route path="reports" element={<Dashboard />} />
+          <Route path="societies" element={<SuperAdminSocieties />} />
+          <Route path="users" element={<SuperAdminUsers />} />
+          <Route path="reports" element={<SuperAdminReports />} />
           <Route path="profile" element={<Profile />} />
         </Route>
       </Route>
